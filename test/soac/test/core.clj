@@ -19,7 +19,15 @@
     (is (== -1 (.indexOf soa [0.0 -1 0.0])))
     (.add soa [0.0 -1 0.0])
     (is (.contains soa [0.0 -1 0.0]))
-    (is (== 1000 (.indexOf soa [0.0 -1 0.0])))))
+    (is (== 1000 (.indexOf soa [0.0 -1 0.0])))
+    
+    (.remove soa (int 1000))
+    (is (not (.contains soa [0.0 -1 0.0])))
+    
+    (let [f-elem (first soa)]
+      (is (.contains soa f-elem))
+      (.remove soa f-elem)
+      (is (not (.contains soa f-elem))))))
 
 (deftest test-sorting
   (let [soa (doto (make-SOA :double :int :double)

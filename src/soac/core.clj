@@ -96,7 +96,7 @@
                  (rest remaining))))))
   (clear [this] (set! filledLength (int 0)))
   (contains [this o] 
-    (pos? (.indexOf this o)))
+    (<= 0 (.indexOf this o)))
   (containsAll [this c] (every? (set this) c))
   (equals [this o]
     (if-not (instance? java.util.Collection o) false
@@ -118,12 +118,12 @@
   (listIterator [this] (SOAIterator. this (atom -0.5)))
   (listIterator [this index] (SOAIterator. this (atom (- index 0.5))))
   (remove [this ^int index]
-    (if (or (< 0 index) (>= index filledLength))
+    (if (or (> 0 index) (>= index filledLength))
       (throw (IndexOutOfBoundsException.))
-      (do (dotimes [i width]
-            (System/arraycopy (aget arrays i)
+      (do (dotimes [array-n width]
+            (System/arraycopy (aget arrays array-n)
                               (inc index)
-                              (aget arrays i)
+                              (aget arrays array-n)
                               index
                               (- filledLength index 1)))
         (set! filledLength (unchecked-dec-int filledLength)))))
