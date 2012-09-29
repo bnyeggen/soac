@@ -99,8 +99,9 @@
     (pos? (.indexOf this o)))
   (containsAll [this c] (every? (set this) c))
   (equals [this o]
-    (every? #(= (first %) (second %)) 
-            (map vector this o)))
+    (if-not (instance? java.util.Collection o) false
+      (every? #(= (first %) (second %))
+              (map vector this o))))
   (get [this i] (nth this i))
   (indexOf [this o]
     (loop [i (int 0)]

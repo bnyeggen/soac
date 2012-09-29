@@ -10,9 +10,11 @@
     (.addAll soa a)
     (is (== 1000 (count soa)))
     (is (= soa a))
+    (is (not (= 7 soa)))
+    (is (not (= [] soa)))
     (trim! soa)
     (is (= soa a))
-    
+        
     (is (not (.contains soa [0.0 -1 0.0])))
     (is (== -1 (.indexOf soa [0.0 -1 0.0])))
     (.add soa [0.0 -1 0.0])
