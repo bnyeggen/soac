@@ -1,5 +1,6 @@
 (ns soac.core
-  (:import [java.lang UnsupportedOperationException System]
+  (:import [java.lang
+            UnsupportedOperationException System IndexOutOfBoundsException]
            [java.util NoSuchElementException]))
 (set! *warn-on-reflection* true)
 
@@ -45,7 +46,7 @@
   (count [this] filledLength)
   (nth [this i] 
     (if (>= i filledLength) 
-      (throw (java.lang.IndexOutOfBoundsException.))
+      (throw (IndexOutOfBoundsException.))
       (loop [out (transient [])
              ct (int 0)]
         (if (== ct width) (persistent! out)
@@ -53,7 +54,7 @@
                  (unchecked-inc-int ct))))))
   (nth [this i notFound]
     (try (nth this i)
-      (catch java.lang.IndexOutOfBoundsException e notFound)))
+      (catch IndexOutOfBoundsException e notFound)))
   clojure.lang.ILookup
   (valAt [this key] (nth this key))
   (valAt [this key notFound] (nth this key notFound))
@@ -115,14 +116,16 @@
           (recur (unchecked-dec-int i))))))
   (listIterator [this] (SOAIterator. this (atom -0.5)))
   (listIterator [this index] (SOAIterator. this (atom (- index 0.5))))
-  (remove [this ^int index] 
-    (dotimes [i width]
-      (System/arraycopy (aget arrays i)
-                        (inc index)
-                        (aget arrays i)
-                        index
-                        (- filledLength index 1)))
-    (set! filledLength (unchecked-dec-int filledLength)))
+  (remove [this ^int index]
+    (if (or (< 0 index) (>= index filledLength))
+      (throw (IndexOutOfBoundsException.))
+      (do (dotimes [i width]
+            (System/arraycopy (aget arrays i)
+                              (inc index)
+                              (aget arrays i)
+                              index
+                              (- filledLength index 1)))
+        (set! filledLength (unchecked-dec-int filledLength)))))
   (^boolean remove [this ^Object o]
     (let [i (.indexOf this o)]
       (if (<= 0 i) (do (.remove this i) true) false)))
@@ -132,7 +135,7 @@
         (if (== i filledLength) m
           (if (s (nth this i))
             (do (.remove this (int i))
-              (recur (unchecked-inc-int i) true))
+              (recur (int i) true))
             (recur (unchecked-inc-int i) m))))))
   (retainAll [this c]
     (let [s (set c)]
@@ -140,7 +143,7 @@
         (if (== i filledLength) m
           (if-not (s (nth this i))
             (do (.remove this (int i))
-              (recur (unchecked-inc-int i) true))
+              (recur (int i) true))
             (recur (unchecked-inc-int i) m))))))
   (set [this index element]
     (dotimes [i width]
