@@ -99,8 +99,8 @@
     (pos? (.indexOf this o)))
   (containsAll [this c] (every? (set this) c))
   (equals [this o]
-    (every? #(= (nth o %) (nth this %)) 
-            (range filledLength)))
+    (every? #(= (first %) (second %)) 
+            (map vector this o)))
   (get [this i] (nth this i))
   (indexOf [this o]
     (loop [i (int 0)]
