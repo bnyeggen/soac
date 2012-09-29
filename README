@@ -1,0 +1,12 @@
+Java object overhead can be killer when dealing with large amounts of data.
+Coincidentally, traversal of lazily constructed and intricately nested data
+structures often takes more time than actual computation.
+Because of the way Java allocates arrays, the only real way to get around the
+object overhead is to represent a stream of objects as a Struct-Of-(primitive)
+Arrays, rather than an Array (or Seq)-Of-Structs.
+
+These are (mostly) fast, (especially) memory-efficient, (generally) general 
+Struct-Of-Arrays in Clojure.  Please be aware that these are basically mutable.
+
+AOT-compiling this should result in classes that are eminently usable from
+Java.
