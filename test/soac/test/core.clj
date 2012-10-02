@@ -21,11 +21,13 @@
         
     (is (not (.contains soa [0.0 -1 0.0])))
     (is (== -1 (.indexOf soa [0.0 -1 0.0])))
+    (is (== -1 (.lastIndexOf soa [0.0 -1 0.0])))
     
     (.add soa [0.0 -1 0.0])
     (is (== (count soa) 1001))
     (is (.contains soa [0.0 -1 0.0]))
     (is (== 1000 (.indexOf soa [0.0 -1 0.0])))
+    (is (== 1000 (.lastIndexOf soa [0.0 -1 0.0])))
     
     (.remove soa (int 1000))
     (is (not (.contains soa [0.0 -1 0.0])))
@@ -37,7 +39,11 @@
       (is (not (.contains soa f-elem))))
     (.clear soa)
     (is (.isEmpty soa))
-    (is (== 0 (count soa)))))
+    (is (== 0 (count soa)))
+    
+    (.add soa [0.0 -1 0.0])
+    (.add soa [0.0 -1 0.0])
+    (is (== 1 (.lastIndexOf soa [0.0 -1 0.0])))))
 
 (deftest test-sorting
   (let [soa (doto (make-SOA :double :int :double)
