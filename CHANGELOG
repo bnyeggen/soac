@@ -1,0 +1,14 @@
+0.1.0:
+First public version.
+
+0.1.1:
+Faster in-place sort
+Fix bug w/ lastIndexOf 
+Additional tests for lastIndexOf
+
+0.1.2:
+Direct implementation of seqs for faster traversal
+PersistentSOA: Persistent version of SOA with roughly the same performance
+as mutable version in optimal case
+Parameterize array expansion factor rather than having it as a literal
+Micro benchmarks as part of tests

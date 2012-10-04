@@ -1,4 +1,4 @@
-(defproject soac "0.1.1"
+(defproject soac "0.1.2"
   :description "Flexible structs-of-arrays"
   :url "https://github.com/fiatmoney/soac"
   ;I believe this is a Leiningen 2 option, currently no raw Java but may be

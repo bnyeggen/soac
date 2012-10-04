@@ -5,6 +5,8 @@
            [java.util.concurrent.atomic AtomicInteger]))
 (set! *warn-on-reflection* true)
 
+(def ^:const ARRAY-EXPANSION-FACTOR 2)
+
 ;Macro-generated versions of these are somehow slower in tests.
 (defn- copy-booleans [^booleans a ^long s] (java.util.Arrays/copyOf a s))
 (defn- copy-chars [^chars a ^long s] (java.util.Arrays/copyOf a s))
@@ -31,7 +33,7 @@
   (instance? (class inst2) inst1))
 
 (defn- array-to-aget 
-  "Given an instance of the class, return the "
+  "Given an instance of the class, return the proper typed aget fn."
   [instance]
   (condp share-class? instance
     (boolean-array 0) aget-booleans
@@ -48,17 +50,18 @@
 (defprotocol buffered
   "A data structure whose internal representation has some 'growth buffer'
    that can be reduced or expanded without affecting the external
-   representation.  Since there is only one implementation this could be a
-   vanilla function, except for that it has to modify internal fields."
+   representation."
   (trim! [this] "Remove the buffer, minimizing memory usage.  Further adds will
     require an expansion.")
   (expand! [this] "Increase the buffer of the target."))
 
 ;List-iterator over an SOA. Lookups only require the backing data structure
 ;to be a clojure.lang.Indexed.
+;Because Iterator.next() actually resolves and returns the elemtn, this is not
+;as speedy as for instance a seq over a vector.
 (deftype SOAIterator
   [^clojure.lang.Indexed s
-   position];atom with -0.5 at beginning
+   position];atom with -0.5 at beginning; TODO: Replace this w/ AtomicInteger
   java.util.ListIterator
   (add [this e] (throw (UnsupportedOperationException.)))
   ;It would be reasonably trivial to implement this against an SOA
@@ -77,6 +80,25 @@
   (nextIndex [this] (int (inc @position)))
   (previousIndex [this] (int @position)))
 
+(deftype SOASeq
+  [s ^int position]
+  clojure.lang.ISeq
+  (count [this] (- (count s) position))
+  (cons [this o] (cons o this))
+  (empty [this] '())
+  (equiv [this o] (every? true? (map = this o)))
+  (seq [this] this)
+  (first [this] (nth s position))
+  (next [this] (if (> (count s) (inc position))
+                 (SOASeq. s (inc position)) nil))
+  (more [this] (let [m (next this)] (if-not (nil? m) m '())))
+  clojure.lang.Indexed
+  (nth [this i]
+    (nth s (+ position i)))
+  (nth [this i notfound]
+    (try (nth this i)
+      (catch IndexOutOfBoundsException e notfound))))
+
 (deftype SOA
   [^objects arrays
    asetFns
@@ -85,6 +107,8 @@
    ^int width
    ^:unsynchronized-mutable ^int realLength
    ^:unsynchronized-mutable ^int filledLength]
+  clojure.lang.Seqable
+  (seq [this] (SOASeq. this 0))
   clojure.lang.Indexed
   (count [this] filledLength)
   (nth [this i] 
@@ -210,8 +234,8 @@
     (dotimes [i (alength arrays)]
       (let [this-array (aget arrays i)]
         (aset arrays i 
-              ((nth copyFns i) this-array (* 2 realLength)))))
-    (set! realLength (int (* 2 realLength)))))
+              ((nth copyFns i) this-array (* ARRAY-EXPANSION-FACTOR realLength)))))
+    (set! realLength (int (* ARRAY-EXPANSION-FACTOR realLength)))))
 
 (defn- swap-indexes!
   "Swap the elements in the SOA at positions i and j."
@@ -319,3 +343,181 @@
           init-length
           0)))
 
+;This is only efficient if you're only conj'ing onto the most recent
+;"version".  Editing or expanding from an earlier version will result in quite
+;a bit of copying and probably higher total memory usage than a Clojure vector
+;with better structural sharing.
+(deftype ImmutableSOA
+  [;Shared between different seqs - tells you if you're holding an "old"
+   ;version and need to copy the backing structure to conj on a (presumably
+   ;different) element.  "Split" when backing data diverges due to an edit
+   ;or expansion
+   ^:unsynchronized-mutable ^AtomicInteger sharedNextUnfilledIndex
+   ^objects arrays
+   asetFns
+   agetFns
+   copyFns
+   ^int width
+   ^:unsynchronized-mutable ^int realLength
+   ^int nextUnfilledIndex]
+  clojure.lang.IPersistentCollection
+  (count [this] nextUnfilledIndex)
+  ;Really, conj - can add anywhere
+  (cons [this o]
+    (when (== realLength nextUnfilledIndex) (expand! this))
+    ;If the element I'm trying to add hasn't been filled by another instance
+    ;that shares the same backing data, I can simply add it to the end of my
+    ;data and increment both the shared and my own nextUnfilledIndex
+    (if (.compareAndSet sharedNextUnfilledIndex 
+          nextUnfilledIndex 
+          (unchecked-inc-int nextUnfilledIndex))
+      ;Add to end and futz w/ counters
+      (do (dotimes [array-idx width]
+            ((nth asetFns array-idx) 
+              (aget arrays array-idx) nextUnfilledIndex (nth o array-idx)))
+        (ImmutableSOA. 
+          sharedNextUnfilledIndex arrays asetFns agetFns copyFns width realLength
+          (unchecked-inc-int nextUnfilledIndex)))
+      ;Otherwise, functionally an edit, have to make new copy of backing data
+      (let [new-arrays (object-array width)]
+        (dotimes [array-idx width]
+          (aset new-arrays array-idx 
+            ((nth copyFns array-idx) (aget arrays array-idx) realLength))
+          ((nth asetFns array-idx) 
+            (aget new-arrays array-idx) nextUnfilledIndex (nth o array-idx)))
+        (ImmutableSOA.
+          (AtomicInteger. (.get sharedNextUnfilledIndex))
+          new-arrays
+          asetFns
+          agetFns
+          copyFns
+          width
+          realLength
+          (unchecked-inc-int nextUnfilledIndex)))))
+  (equiv [this o]
+    (if-not (instance? java.util.Collection o) false
+      (every? #(= (first %) (second %))
+              (map vector this o))))
+  ;TODO: make a bona fide seq that doesn't depend on resolving each element
+  ;for traversal.  Should be much faster.
+  (seq [this] (SOASeq. this 0))
+  clojure.lang.Indexed
+  (nth [this i] 
+    (if (>= i nextUnfilledIndex) 
+      (throw (IndexOutOfBoundsException.))
+      (loop [out (transient [])
+             ct (int 0)]
+        (if (== ct width) (persistent! out)
+          (recur (conj! out ((nth agetFns ct) (aget arrays ct) i))
+                 (unchecked-inc-int ct))))))
+  (nth [this i notFound]
+    (try (nth this i)
+      (catch IndexOutOfBoundsException e notFound)))  
+  clojure.lang.ILookup
+  (valAt [this key] (nth this key))
+  (valAt [this key notFound] (nth this key notFound))
+  java.util.RandomAccess
+  buffered
+  ;In this implementation, trimming only helps if the only reference to the 
+  ;current backing arrays goes away, otherwise it's obviously a net space
+  ;loss.  Also, currently does not trim away "hidden" elements less than 
+  ;firstFilledIndex
+  (trim! [this]
+    ;"Split" the shared counter, since it will refer to an isolated copy of the
+    ;data 
+    (set! sharedNextUnfilledIndex (AtomicInteger. (.get sharedNextUnfilledIndex)))
+    (dotimes [i width]
+      (aset arrays i
+        ((nth copyFns i) 
+          (aget arrays i) nextUnfilledIndex)))
+    (set! realLength nextUnfilledIndex))
+  ;Ditto
+  (expand! [this]
+    (set! sharedNextUnfilledIndex (AtomicInteger. (.get sharedNextUnfilledIndex)))
+    (dotimes [i (alength arrays)]
+      (let [this-array (aget arrays i)]
+        (aset arrays i 
+              ((nth copyFns i) this-array (* ARRAY-EXPANSION-FACTOR realLength)))))
+    (set! realLength (int (* ARRAY-EXPANSION-FACTOR realLength))))
+  java.util.List
+  (indexOf [this o]
+    (loop [i (int 0)]
+      (if (== i (count this)) -1
+        (if (= (nth this i) o) i
+          (recur (unchecked-inc-int i))))))
+  (lastIndexOf [this o]
+    (loop [i (unchecked-dec-int (count this))]
+      (if (== i -1) -1
+        (if (= (nth this i) o) i
+          (recur (unchecked-dec-int i))))))
+  ;May implement this later
+  (subList [this fromIndex toIndex] (throw (UnsupportedOperationException.)))
+  
+  (listIterator [this] (SOAIterator. this (atom -0.5)))
+  (listIterator [this index] (SOAIterator. this (atom (- index 0.5))))
+  (contains [this o] (<= 0 (.indexOf this o)))
+  (containsAll [this c] (every? (set this) c))
+  (equals [this o] (.equiv this o))
+  (get [this i] (nth this i))
+  (isEmpty [this] (zero? (count this)))
+  (iterator [this] (.listIterator this))
+  (size [this] (count this))
+  (toArray [this] (object-array this))
+  (toArray [this a]
+    (dotimes [i nextUnfilledIndex] (aset a i (nth this i)))
+    a)
+  ;No mutatin'
+  (add [this e] (throw (UnsupportedOperationException.)))
+  (add [this i e] (throw (UnsupportedOperationException.)))
+  (addAll [this c] (throw (UnsupportedOperationException.)))
+  (addAll [this i c] (throw (UnsupportedOperationException.)))
+  (clear [this] (throw (UnsupportedOperationException.)))
+  (remove [this ^int index] (throw (UnsupportedOperationException.)))
+  (^boolean remove [this ^Object o] (throw (UnsupportedOperationException.)))
+  (removeAll [this c] (throw (UnsupportedOperationException.)))
+  (retainAll [this c] (throw (UnsupportedOperationException.)))
+  (set [this index element] (throw (UnsupportedOperationException.))))
+
+(defn immutable-SOA [& types]
+  (let [init-length 1024
+        arrays (object-array
+                 (for [type types]
+                   (case (keyword type)
+                     :boolean (boolean-array init-length)
+                     :char (char-array init-length)
+                     :byte (byte-array init-length)
+                     :short (short-array init-length)
+                     :int (int-array init-length)
+                     :long (long-array init-length)
+                     :float (float-array init-length)
+                     :double (double-array init-length)
+                     (object-array init-length))))]
+    (ImmutableSOA. 
+      (AtomicInteger. 0)
+      arrays
+      (vec (for [type types]
+             (case (keyword type)
+               :boolean aset-boolean
+               :char aset-char
+               :byte aset-byte
+               :short aset-short
+               :int aset-int
+               :long aset-long
+               :float aset-float
+               :double aset-double
+               aset)))
+      (vec (map array-to-aget arrays))
+      (vec (for [type types]
+             (case (keyword type)
+               :boolean copy-booleans
+               :char copy-chars
+               :byte copy-bytes
+               :short copy-shorts
+               :int copy-ints
+               :long copy-longs
+               :float copy-floats
+               :double copy-doubles
+               copy-objects)))
+      (count types)
+      init-length
+      0)))

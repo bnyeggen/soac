@@ -6,7 +6,27 @@ object overhead is to represent a stream of objects as a Struct-Of-(primitive)
 Arrays, rather than an Array (or Seq)-Of-Structs.
 
 These are (mostly) fast, (especially) memory-efficient, (generally) general 
-Struct-Of-Arrays in Clojure.  Please be aware that these are basically mutable.
+Struct-Of-Arrays in Clojure.
 
-AOT-compiling this should result in classes that are eminently usable from
+Two implementations are provided; a mutable SOA, and an immutable ImmutableSOA.
+AOT-compiling either should result in classes that are eminently usable from
 Java.
+
+Performance notes:
+Conj-ing into a raw Clojure vector is faster than .addAll to a SOA, or conj-ing
+into an immutable SOA.  This is primarily due to unboxing and having to
+destructure the incoming array for the SOA version; for the Clojure vector it's
+all essentially pointer manipulation under the hood.  However, memory usage 
+should be much lower - a marginal entry in an long-boolean-int-double SOA takes
+21 bytes; for a Clojure deftype wrapping the primitives and stored in a vector,
+you're looking at >32.  In general the object overhead will be at least between
+8 and 15 bytes per entry.  The case when storing Clojure vector-of-vectors is
+much worse.
+
+TODO:
+- Make persistent SOA implement IObj, maybe IPersistentVector.
+- Make both SOAs implement InternalReduce and IReduce
+- Benchmark performance of Clojure vector for wrapping underlying data arrays,
+  versus a Java object-array; and the same for stored accessing/writing/copying
+  fns.
+- Examples of Java usage.
