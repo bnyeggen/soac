@@ -234,7 +234,7 @@
     (dotimes [i (alength arrays)]
       (let [this-array (aget arrays i)]
         (aset arrays i 
-              ((nth copyFns i) this-array (* ARRAY-EXPANSION-FACTOR realLength)))))
+              ((nth copyFns i) this-array (int (* ARRAY-EXPANSION-FACTOR realLength))))))
     (set! realLength (int (* ARRAY-EXPANSION-FACTOR realLength)))))
 
 (defn- swap-indexes!
@@ -437,7 +437,7 @@
     (dotimes [i (alength arrays)]
       (let [this-array (aget arrays i)]
         (aset arrays i 
-              ((nth copyFns i) this-array (* ARRAY-EXPANSION-FACTOR realLength)))))
+              ((nth copyFns i) this-array (int (* ARRAY-EXPANSION-FACTOR realLength))))))
     (set! realLength (int (* ARRAY-EXPANSION-FACTOR realLength))))
   java.util.List
   (indexOf [this o]
