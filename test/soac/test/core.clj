@@ -113,8 +113,9 @@
     (time (into im-soa s))
     (print "Mutable SOA contruction: ")
     (time (.addAll soa s)))
-  (let [v (vec (repeatedly 262144 
+  (let [v (conj (vec (repeatedly 500000
                  #(vector (rand) (rand-int 100) (rand))))
+                [0.0 1 0.0])
         im-soa (into (immutable-SOA :double :int :double) v)
         soa (doto (make-SOA :double :int :double) (.addAll v))]
     (print "Vector traversal: ")
@@ -122,4 +123,8 @@
     (print "Immutable SOA traversal: ")
     (time (last im-soa))
     (print "Mutable SOA traversal: ")
-    (time (last soa))))
+    (time (last soa))
+    (print "Mutable SOA sort in-place: ")
+    (time (sort-SOA-inplace! soa 0))
+    (print "Mutable SOA search: ")
+    (time (find-sorted soa 0 0.0))))

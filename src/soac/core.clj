@@ -1,7 +1,7 @@
 (ns soac.core
   (:import [java.lang
             UnsupportedOperationException System IndexOutOfBoundsException]
-           [java.util NoSuchElementException]
+           [java.util NoSuchElementException Arrays]
            [java.util.concurrent.atomic AtomicInteger]))
 (set! *warn-on-reflection* true)
 
@@ -53,7 +53,9 @@
    representation."
   (trim! [this] "Remove the buffer, minimizing memory usage.  Further adds will
     require an expansion.")
-  (expand! [this] "Increase the buffer of the target."))
+  (expand! [this] "Increase the buffer of the target.")
+  (get-raw-buffers [this] [this n] "Return the raw data backing the collection,
+    or a particular sub-array"))
 
 ;List-iterator over an SOA. Lookups only require the backing data structure
 ;to be a clojure.lang.Indexed.
@@ -224,6 +226,8 @@
     (dotimes [i filledLength] (aset a i (nth this i)))
     a)
   buffered
+  (get-raw-buffers [this] arrays)
+  (get-raw-buffers [this n] (aget arrays n))
   (trim! [this]
     (dotimes [i width]
       (aset arrays i
@@ -261,6 +265,8 @@
    comparison - could use the entire outputted struct/vector, and force the
    comparator to extract the necessary information."
   ([^SOA s sort-column cmp]
+    ;Trimming ensures the underlying arrays will be sorted even including the
+    ;unfilled elements (since there will be none).
     (trim! s)
     ;This is a little bit janky to express, we've basically got a doubly nested
     ;loop expressed as doubly conditional recursion
@@ -418,6 +424,8 @@
   (valAt [this key notFound] (nth this key notFound))
   java.util.RandomAccess
   buffered
+  (get-raw-buffers [this] arrays)
+  (get-raw-buffers [this n] (aget arrays n))
   ;In this implementation, trimming only helps if the only reference to the 
   ;current backing arrays goes away, otherwise it's obviously a net space
   ;loss.  Also, currently does not trim away "hidden" elements less than 
@@ -521,3 +529,13 @@
       (count types)
       init-length
       0)))
+
+(defn find-sorted
+  "Assuming the SOA is sorted by the given column, conduct a binary search
+   looking for the given value, and return that element of the SOA."
+  [s col-number targ]
+  ;This reflection may or may not actually have performance impacts - finding
+  ;in an array of 1m takes ~ 0.1ms even without the hint
+  (let 
+    [i (-> (get-raw-buffers s col-number) (Arrays/binarySearch targ))]
+    (if (>= i 0) (nth s i) nil)))
