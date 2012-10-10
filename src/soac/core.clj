@@ -1,11 +1,12 @@
 (ns soac.core
   (:import [java.lang
             UnsupportedOperationException System IndexOutOfBoundsException]
-           [java.util NoSuchElementException Arrays]
+           [java.util NoSuchElementException Arrays BitSet]
            [java.util.concurrent.atomic AtomicInteger]))
 (set! *warn-on-reflection* true)
 
-(def ^:const ARRAY-EXPANSION-FACTOR 2)
+(def ^:const ARRAY-EXPANSION-FACTOR 1.25)
+(def ^:const INITIAL-LENGTH 4)
 
 ;Macro-generated versions of these are somehow slower in tests.
 (defn- copy-booleans [^booleans a ^long s] (java.util.Arrays/copyOf a s))
@@ -17,6 +18,7 @@
 (defn- copy-floats [^floats a ^long s] (java.util.Arrays/copyOf a s))
 (defn- copy-doubles [^doubles a ^long s] (java.util.Arrays/copyOf a s))
 (defn- copy-objects [^objects a ^long s] (java.util.Arrays/copyOf a s))
+(defn- copy-bits [^BitSet a ^long s] (.get a 0 s))
 
 (defn- aget-booleans [^booleans a i] (aget a i))
 (defn- aget-chars [^chars a i] (aget a i))
@@ -27,10 +29,16 @@
 (defn- aget-floats [^floats a i] (aget a i))
 (defn- aget-doubles [^doubles a i] (aget a i))
 (defn- aget-objects [^objects a i] (aget a i))
+(defn- aget-bit [^BitSet a i] (.get a i))
+
+(defn- aset-bit [^BitSet a i v] (.set a i (case v 0 false nil false false false true)))
 
 (defn- share-class?
   [inst1 inst2]
   (instance? (class inst2) inst1))
+
+(defn- expand-size [current] 
+  (int (max (inc current) (* ARRAY-EXPANSION-FACTOR current))))
 
 (defn- array-to-aget 
   "Given an instance of the class, return the proper typed aget fn."
@@ -45,6 +53,7 @@
     (float-array 0) aget-floats
     (double-array 0) aget-doubles
     (object-array 0) aget-objects
+    (BitSet. 0) aget-bit
     aget))
 
 (defprotocol buffered
@@ -238,8 +247,8 @@
     (dotimes [i (alength arrays)]
       (let [this-array (aget arrays i)]
         (aset arrays i 
-              ((nth copyFns i) this-array (int (* ARRAY-EXPANSION-FACTOR realLength))))))
-    (set! realLength (int (* ARRAY-EXPANSION-FACTOR realLength)))))
+              ((nth copyFns i) this-array (expand-size realLength)))))
+    (set! realLength (int (expand-size realLength)))))
 
 (defn- swap-indexes!
   "Swap the elements in the SOA at positions i and j."
@@ -308,19 +317,19 @@
    (make-SOA :int :double :byte :byte :object)"
   [& types]
   ;Initial length should probably be fairly high, or why are you using this?
-  (let [init-length 1024
-        arrays (object-array
+  (let [arrays (object-array
                  (for [type types]
                    (case (keyword type)
-                     :boolean (boolean-array init-length)
-                     :char (char-array init-length)
-                     :byte (byte-array init-length)
-                     :short (short-array init-length)
-                     :int (int-array init-length)
-                     :long (long-array init-length)
-                     :float (float-array init-length)
-                     :double (double-array init-length)
-                     (object-array init-length))))]
+                     :boolean (boolean-array INITIAL-LENGTH)
+                     :char (char-array INITIAL-LENGTH)
+                     :byte (byte-array INITIAL-LENGTH)
+                     :short (short-array INITIAL-LENGTH)
+                     :int (int-array INITIAL-LENGTH)
+                     :long (long-array INITIAL-LENGTH)
+                     :float (float-array INITIAL-LENGTH)
+                     :double (double-array INITIAL-LENGTH)
+                     :bit (BitSet. INITIAL-LENGTH)
+                     (object-array INITIAL-LENGTH))))]
     (SOA. arrays
           (vec (for [type types]
                  (case (keyword type)
@@ -332,6 +341,7 @@
                    :long aset-long
                    :float aset-float
                    :double aset-double
+                   :bit aset-bit
                    aset)))
           (vec (map array-to-aget arrays))
           (vec (for [type types]
@@ -344,9 +354,10 @@
                    :long copy-longs
                    :float copy-floats
                    :double copy-doubles
+                   :bit copy-bits
                    copy-objects)))
           (count types)
-          init-length
+          INITIAL-LENGTH
           0)))
 
 ;This is only efficient if you're only conj'ing onto the most recent
@@ -445,8 +456,8 @@
     (dotimes [i (alength arrays)]
       (let [this-array (aget arrays i)]
         (aset arrays i 
-              ((nth copyFns i) this-array (int (* ARRAY-EXPANSION-FACTOR realLength))))))
-    (set! realLength (int (* ARRAY-EXPANSION-FACTOR realLength))))
+              ((nth copyFns i) this-array (expand-size realLength)))))
+    (set! realLength (int (expand-size realLength))))
   java.util.List
   (indexOf [this o]
     (loop [i (int 0)]
@@ -487,19 +498,19 @@
   (set [this index element] (throw (UnsupportedOperationException.))))
 
 (defn immutable-SOA [& types]
-  (let [init-length 1024
-        arrays (object-array
+  (let [arrays (object-array
                  (for [type types]
                    (case (keyword type)
-                     :boolean (boolean-array init-length)
-                     :char (char-array init-length)
-                     :byte (byte-array init-length)
-                     :short (short-array init-length)
-                     :int (int-array init-length)
-                     :long (long-array init-length)
-                     :float (float-array init-length)
-                     :double (double-array init-length)
-                     (object-array init-length))))]
+                     :boolean (boolean-array INITIAL-LENGTH)
+                     :char (char-array INITIAL-LENGTH)
+                     :byte (byte-array INITIAL-LENGTH)
+                     :short (short-array INITIAL-LENGTH)
+                     :int (int-array INITIAL-LENGTH)
+                     :long (long-array INITIAL-LENGTH)
+                     :float (float-array INITIAL-LENGTH)
+                     :double (double-array INITIAL-LENGTH)
+                     :bit (BitSet. INITIAL-LENGTH)
+                     (object-array INITIAL-LENGTH))))]
     (ImmutableSOA. 
       (AtomicInteger. 0)
       arrays
@@ -513,6 +524,7 @@
                :long aset-long
                :float aset-float
                :double aset-double
+               :bit aset-bit
                aset)))
       (vec (map array-to-aget arrays))
       (vec (for [type types]
@@ -525,14 +537,16 @@
                :long copy-longs
                :float copy-floats
                :double copy-doubles
+               :bit copy-bits
                copy-objects)))
       (count types)
-      init-length
+      INITIAL-LENGTH
       0)))
 
 (defn find-sorted
   "Assuming the SOA is sorted by the given column, conduct a binary search
-   looking for the given value, and return that element of the SOA."
+   looking for the given value, and return that element of the SOA.
+   Obviously this doesn't work very well for boolean / bit arrays."
   [s col-number targ]
   ;This reflection may or may not actually have performance impacts - finding
   ;in an array of 1m takes ~ 0.1ms even without the hint
