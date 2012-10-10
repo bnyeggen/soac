@@ -7,6 +7,7 @@
 
 (def ^:const ARRAY-EXPANSION-FACTOR 1.25)
 (def ^:const INITIAL-LENGTH 4)
+(def ^:private typed-access-fns (atom {}))
 
 ;Macro-generated versions of these are somehow slower in tests.
 (defn- copy-booleans [^booleans a ^long s] (java.util.Arrays/copyOf a s))
@@ -29,32 +30,59 @@
 (defn- aget-floats [^floats a i] (aget a i))
 (defn- aget-doubles [^doubles a i] (aget a i))
 (defn- aget-objects [^objects a i] (aget a i))
-(defn- aget-bit [^BitSet a i] (.get a i))
+(defn- aget-bits [^BitSet a i] (.get a i))
 
-(defn- aset-bit [^BitSet a i v] (.set a i (case v 0 false nil false false false true)))
-
-(defn- share-class?
-  [inst1 inst2]
-  (instance? (class inst2) inst1))
+(defn- aset-bit [^BitSet a ^long i v] 
+  (.set ^BitSet a i (if (or (not v) (== v 0) false) true)))
 
 (defn- expand-size [current] 
   (int (max (inc current) (* ARRAY-EXPANSION-FACTOR current))))
 
-(defn- array-to-aget 
-  "Given an instance of the class, return the proper typed aget fn."
-  [instance]
-  (condp share-class? instance
-    (boolean-array 0) aget-booleans
-    (char-array 0) aget-chars
-    (byte-array 0) aget-bytes
-    (short-array 0) aget-shorts
-    (int-array 0) aget-ints
-    (long-array 0) aget-longs
-    (float-array 0) aget-floats
-    (double-array 0) aget-doubles
-    (object-array 0) aget-objects
-    (BitSet. 0) aget-bit
-    aget))
+(defn- get-interned-access-fns
+  [types]
+  (if (contains? @typed-access-fns types)
+    (get @typed-access-fns types)
+    (-> (swap! typed-access-fns assoc types
+               {:asetFns (object-array
+                           (for [type types]
+                             (case (keyword type)
+                               :boolean aset-boolean
+                               :char aset-char
+                               :byte aset-byte
+                               :short aset-short
+                               :int aset-int
+                               :long aset-long
+                               :float aset-float
+                               :double aset-double
+                               :bit aset-bit
+                               aset)))
+                :agetFns (object-array 
+                           (for [type types]
+                             (case (keyword type)
+                               :boolean aget-booleans
+                               :char aget-chars
+                               :byte aget-bytes
+                               :short aget-shorts
+                               :int aget-ints
+                               :long aget-longs
+                               :float aget-floats
+                               :double aget-doubles
+                               :bit aget-bits
+                               aget)))
+                :copyFns (object-array 
+                           (for [type types]
+                             (case (keyword type)
+                               :boolean copy-booleans
+                               :char copy-chars
+                               :byte copy-bytes
+                               :short copy-shorts
+                               :int copy-ints
+                               :long copy-longs
+                               :float copy-floats
+                               :double copy-doubles
+                               :bit copy-bits
+                               copy-objects)))})
+      (get types))))
 
 (defprotocol buffered
   "A data structure whose internal representation has some 'growth buffer'
@@ -112,9 +140,9 @@
 
 (deftype SOA
   [^objects arrays
-   asetFns
-   agetFns
-   copyFns
+   ^objects asetFns
+   ^objects agetFns
+   ^objects copyFns
    ^int width
    ^:unsynchronized-mutable ^int realLength
    ^:unsynchronized-mutable ^int filledLength]
@@ -128,7 +156,7 @@
       (loop [out (transient [])
              ct (int 0)]
         (if (== ct width) (persistent! out)
-          (recur (conj! out ((nth agetFns ct) (aget arrays ct) i))
+          (recur (conj! out ((aget agetFns ct) (aget arrays ct) i))
                  (unchecked-inc-int ct))))))
   (nth [this i notFound]
     (try (nth this i)
@@ -142,7 +170,7 @@
     (if (> realLength filledLength)
       ;add normally
       (do (dotimes [i width]
-            ((nth asetFns i) (aget arrays i) filledLength (nth e i)))
+            ((aget asetFns i) (aget arrays i) filledLength (nth e i)))
           (set! filledLength (unchecked-inc-int filledLength)))
       ;expand, then add
       (do 
@@ -158,7 +186,7 @@
                             (aget arrays array-ct)
                             (inc i)
                             (- filledLength i -1))
-          ((nth asetFns array-ct) (aget arrays array-ct) i (nth e array-ct)))
+          ((aget asetFns array-ct) (aget arrays array-ct) i (nth e array-ct)))
         (set! filledLength (unchecked-inc-int filledLength)))
       (do (expand! this)
         (.add this i e))))
@@ -226,7 +254,7 @@
             (recur (unchecked-inc-int i) m))))))
   (set [this index element]
     (dotimes [i width]
-      ((nth asetFns i) arrays i index (nth element i))))
+      ((aget asetFns i) arrays i index (nth element i))))
   (size [this] filledLength)
   ;No intention to support this yet.
   (subList [this fromIndex toIndex] (throw (UnsupportedOperationException.)))
@@ -240,26 +268,26 @@
   (trim! [this]
     (dotimes [i width]
       (aset arrays i
-        ((nth copyFns i) 
+        ((aget copyFns i) 
           (aget arrays i) filledLength)))
     (set! realLength filledLength))
   (expand! [this]
     (dotimes [i (alength arrays)]
       (let [this-array (aget arrays i)]
         (aset arrays i 
-              ((nth copyFns i) this-array (expand-size realLength)))))
+              ((aget copyFns i) this-array (expand-size realLength)))))
     (set! realLength (int (expand-size realLength)))))
 
 (defn- swap-indexes!
   "Swap the elements in the SOA at positions i and j."
-  [^SOA s aget-fns i j]
+  [^SOA s ^objects aget-fns i j]
   (if (>= (max i j) (count s))
     (throw (IndexOutOfBoundsException.))
     (let [old (nth s i)]
       (dotimes [array-idx (.width s)]
         (let [sub-array (aget ^objects (.arrays s) array-idx)
-              aset-fn (nth (.asetFns s) array-idx)
-              aget-fn (nth aget-fns array-idx)]
+              aset-fn (aget ^objects (.asetFns s) array-idx)
+              aget-fn (aget aget-fns array-idx)]
           ;The aget here uses reflection, can't seem to get rid of it
           ;even w/ stored hinted agets
           (aset-fn sub-array i (aget-fn sub-array j))
@@ -317,7 +345,8 @@
    (make-SOA :int :double :byte :byte :object)"
   [& types]
   ;Initial length should probably be fairly high, or why are you using this?
-  (let [arrays (object-array
+  (let [access-fns (get-interned-access-fns types)]
+    (SOA. (object-array
                  (for [type types]
                    (case (keyword type)
                      :boolean (boolean-array INITIAL-LENGTH)
@@ -329,33 +358,10 @@
                      :float (float-array INITIAL-LENGTH)
                      :double (double-array INITIAL-LENGTH)
                      :bit (BitSet. INITIAL-LENGTH)
-                     (object-array INITIAL-LENGTH))))]
-    (SOA. arrays
-          (vec (for [type types]
-                 (case (keyword type)
-                   :boolean aset-boolean
-                   :char aset-char
-                   :byte aset-byte
-                   :short aset-short
-                   :int aset-int
-                   :long aset-long
-                   :float aset-float
-                   :double aset-double
-                   :bit aset-bit
-                   aset)))
-          (vec (map array-to-aget arrays))
-          (vec (for [type types]
-                 (case (keyword type)
-                   :boolean copy-booleans
-                   :char copy-chars
-                   :byte copy-bytes
-                   :short copy-shorts
-                   :int copy-ints
-                   :long copy-longs
-                   :float copy-floats
-                   :double copy-doubles
-                   :bit copy-bits
-                   copy-objects)))
+                     (object-array INITIAL-LENGTH))))
+          (:asetFns access-fns)
+          (:agetFns access-fns)
+          (:copyFns access-fns)
           (count types)
           INITIAL-LENGTH
           0)))
@@ -371,9 +377,9 @@
    ;or expansion
    ^:unsynchronized-mutable ^AtomicInteger sharedNextUnfilledIndex
    ^objects arrays
-   asetFns
-   agetFns
-   copyFns
+   ^objects asetFns
+   ^objects agetFns
+   ^objects copyFns
    ^int width
    ^:unsynchronized-mutable ^int realLength
    ^int nextUnfilledIndex]
@@ -390,7 +396,7 @@
           (unchecked-inc-int nextUnfilledIndex))
       ;Add to end and futz w/ counters
       (do (dotimes [array-idx width]
-            ((nth asetFns array-idx) 
+            ((aget asetFns array-idx) 
               (aget arrays array-idx) nextUnfilledIndex (nth o array-idx)))
         (ImmutableSOA. 
           sharedNextUnfilledIndex arrays asetFns agetFns copyFns width realLength
@@ -399,8 +405,8 @@
       (let [new-arrays (object-array width)]
         (dotimes [array-idx width]
           (aset new-arrays array-idx 
-            ((nth copyFns array-idx) (aget arrays array-idx) realLength))
-          ((nth asetFns array-idx) 
+            ((aget copyFns array-idx) (aget arrays array-idx) realLength))
+          ((aget asetFns array-idx) 
             (aget new-arrays array-idx) nextUnfilledIndex (nth o array-idx)))
         (ImmutableSOA.
           (AtomicInteger. (.get sharedNextUnfilledIndex))
@@ -425,7 +431,7 @@
       (loop [out (transient [])
              ct (int 0)]
         (if (== ct width) (persistent! out)
-          (recur (conj! out ((nth agetFns ct) (aget arrays ct) i))
+          (recur (conj! out ((aget agetFns ct) (aget arrays ct) i))
                  (unchecked-inc-int ct))))))
   (nth [this i notFound]
     (try (nth this i)
@@ -447,7 +453,7 @@
     (set! sharedNextUnfilledIndex (AtomicInteger. (.get sharedNextUnfilledIndex)))
     (dotimes [i width]
       (aset arrays i
-        ((nth copyFns i) 
+        ((aget copyFns i) 
           (aget arrays i) nextUnfilledIndex)))
     (set! realLength nextUnfilledIndex))
   ;Ditto
@@ -456,7 +462,7 @@
     (dotimes [i (alength arrays)]
       (let [this-array (aget arrays i)]
         (aset arrays i 
-              ((nth copyFns i) this-array (expand-size realLength)))))
+              ((aget copyFns i) this-array (expand-size realLength)))))
     (set! realLength (int (expand-size realLength))))
   java.util.List
   (indexOf [this o]
@@ -498,47 +504,25 @@
   (set [this index element] (throw (UnsupportedOperationException.))))
 
 (defn immutable-SOA [& types]
-  (let [arrays (object-array
-                 (for [type types]
-                   (case (keyword type)
-                     :boolean (boolean-array INITIAL-LENGTH)
-                     :char (char-array INITIAL-LENGTH)
-                     :byte (byte-array INITIAL-LENGTH)
-                     :short (short-array INITIAL-LENGTH)
-                     :int (int-array INITIAL-LENGTH)
-                     :long (long-array INITIAL-LENGTH)
-                     :float (float-array INITIAL-LENGTH)
-                     :double (double-array INITIAL-LENGTH)
-                     :bit (BitSet. INITIAL-LENGTH)
-                     (object-array INITIAL-LENGTH))))]
+  (let [access-fns (get-interned-access-fns types)]
     (ImmutableSOA. 
       (AtomicInteger. 0)
-      arrays
-      (vec (for [type types]
-             (case (keyword type)
-               :boolean aset-boolean
-               :char aset-char
-               :byte aset-byte
-               :short aset-short
-               :int aset-int
-               :long aset-long
-               :float aset-float
-               :double aset-double
-               :bit aset-bit
-               aset)))
-      (vec (map array-to-aget arrays))
-      (vec (for [type types]
-             (case (keyword type)
-               :boolean copy-booleans
-               :char copy-chars
-               :byte copy-bytes
-               :short copy-shorts
-               :int copy-ints
-               :long copy-longs
-               :float copy-floats
-               :double copy-doubles
-               :bit copy-bits
-               copy-objects)))
+      (object-array
+        (for [type types]
+          (case (keyword type)
+            :boolean (boolean-array INITIAL-LENGTH)
+            :char (char-array INITIAL-LENGTH)
+            :byte (byte-array INITIAL-LENGTH)
+            :short (short-array INITIAL-LENGTH)
+            :int (int-array INITIAL-LENGTH)
+            :long (long-array INITIAL-LENGTH)
+            :float (float-array INITIAL-LENGTH)
+            :double (double-array INITIAL-LENGTH)
+            :bit (BitSet. INITIAL-LENGTH)
+            (object-array INITIAL-LENGTH))))
+      (:asetFns access-fns)
+      (:agetFns access-fns)
+      (:copyFns access-fns)
       (count types)
       INITIAL-LENGTH
       0)))
