@@ -143,7 +143,7 @@
    ^objects asetFns
    ^objects agetFns
    ^objects copyFns
-   ^int width
+   ^short width ;I sure hope you don't have more than 32k columns
    ^:unsynchronized-mutable ^int realLength
    ^:unsynchronized-mutable ^int filledLength]
   clojure.lang.Seqable
@@ -300,7 +300,9 @@
    faster to sort the seq of structs and populate a new SOA.
    As of right now, only allows using a single sort-column as the item for
    comparison - could use the entire outputted struct/vector, and force the
-   comparator to extract the necessary information."
+   comparator to extract the necessary information.
+
+   Uses a comb sort for average n*log(n) performance."
   ([^SOA s sort-column cmp]
     ;Trimming ensures the underlying arrays will be sorted even including the
     ;unfilled elements (since there will be none).
@@ -317,7 +319,8 @@
         (cond
           ;Made a complete pass with gap of 1 and no swapping => done
           (and (== idx (dec length)) (== gap 1) (not swapped)) nil
-          ;Finished one pass => shrink gap and make another pass
+          ;Finished a pass => shrink gap by 1/(1-e^(-phi)) and make another
+          ;pass
           (>= (+ idx gap) length)
             (recur (int (max 1 (/ gap 1.247330950103979))) false 0)
           ;Inversion => swap the elements in place, mark as swapped, go to next
@@ -347,18 +350,18 @@
   ;Initial length should probably be fairly high, or why are you using this?
   (let [access-fns (get-interned-access-fns types)]
     (SOA. (object-array
-                 (for [type types]
-                   (case (keyword type)
-                     :boolean (boolean-array INITIAL-LENGTH)
-                     :char (char-array INITIAL-LENGTH)
-                     :byte (byte-array INITIAL-LENGTH)
-                     :short (short-array INITIAL-LENGTH)
-                     :int (int-array INITIAL-LENGTH)
-                     :long (long-array INITIAL-LENGTH)
-                     :float (float-array INITIAL-LENGTH)
-                     :double (double-array INITIAL-LENGTH)
-                     :bit (BitSet. INITIAL-LENGTH)
-                     (object-array INITIAL-LENGTH))))
+            (for [type types]
+              (case (keyword type)
+                :boolean (boolean-array INITIAL-LENGTH)
+                :char (char-array INITIAL-LENGTH)
+                :byte (byte-array INITIAL-LENGTH)
+                :short (short-array INITIAL-LENGTH)
+                :int (int-array INITIAL-LENGTH)
+                :long (long-array INITIAL-LENGTH)
+                :float (float-array INITIAL-LENGTH)
+                :double (double-array INITIAL-LENGTH)
+                :bit (BitSet. INITIAL-LENGTH)
+                (object-array INITIAL-LENGTH))))
           (:asetFns access-fns)
           (:agetFns access-fns)
           (:copyFns access-fns)
@@ -380,7 +383,7 @@
    ^objects asetFns
    ^objects agetFns
    ^objects copyFns
-   ^int width
+   ^short width ;Max of 32k columns
    ^:unsynchronized-mutable ^int realLength
    ^int nextUnfilledIndex]
   clojure.lang.IPersistentCollection
