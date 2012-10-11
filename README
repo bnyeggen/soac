@@ -26,7 +26,4 @@ much worse.
 TODO:
 - Make persistent SOA implement IObj, maybe IPersistentVector.
 - Make both SOAs implement InternalReduce and IReduce
-- Benchmark performance of Clojure vector for wrapping underlying data arrays,
-  versus a Java object-array; and the same for stored accessing/writing/copying
-  fns.
 - Examples of Java usage.
