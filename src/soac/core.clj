@@ -155,7 +155,7 @@
       (throw (IndexOutOfBoundsException.))
       (loop [out (transient [])
              ct (int 0)]
-        (if (== ct width) (persistent! out)
+        (if (== ct (int width)) (persistent! out)
           (recur (conj! out ((aget agetFns ct) (aget arrays ct) i))
                  (unchecked-inc-int ct))))))
   (nth [this i notFound]
@@ -433,7 +433,7 @@
       (throw (IndexOutOfBoundsException.))
       (loop [out (transient [])
              ct (int 0)]
-        (if (== ct width) (persistent! out)
+        (if (== ct (int width)) (persistent! out)
           (recur (conj! out ((aget agetFns ct) (aget arrays ct) i))
                  (unchecked-inc-int ct))))))
   (nth [this i notFound]
