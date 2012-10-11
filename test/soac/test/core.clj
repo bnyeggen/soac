@@ -65,11 +65,16 @@
       (is (not= s2 s3)))))
 
 (deftest test-sorting
-  (let [soa (doto (make-SOA :double :int :double)
-              (.addAll (repeatedly 1000 #(vector (rand) (rand-int 100) (rand)))))]
-    (sort-SOA-inplace! soa 0)
+  (let [soa1 (doto (make-SOA :double :int :double)
+               (.addAll (repeatedly 1000 #(vector (rand) (rand-int 100) (rand)))))
+        soa2 (doto (make-SOA :double :int :double)
+               (.addAll (repeatedly 1000 #(vector (rand) (rand-int 100) (rand)))))]
+    (sort-SOA-inplace! soa1 0)
+    (sort-SOA-external! soa2 0)
     (is (every? #(< (first %) (second %))
-                (partition 2 1 (map first (seq soa)))))))
+                (partition 2 1 (map first (seq soa1)))))
+    (is (every? #(< (first %) (second %))
+                (partition 2 1 (map first (seq soa2)))))))
 
 (deftest test-SOA-iterators
   (let [soa (doto (make-SOA :double :int :double)

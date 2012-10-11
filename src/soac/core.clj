@@ -333,6 +333,15 @@
           :else (recur gap swapped (unchecked-inc-int idx))))))
   ([^SOA s sort-column] (sort-SOA-inplace! s sort-column compare)))
 
+(defn sort-SOA-external!
+  "Sort the SOA using external storage, by the given column."
+  [^SOA s sort-column]
+  ;SOASeq doesn't implement toArray, so we manually put it in
+  (let [sorted-structs (sort-by #(nth % sort-column) (object-array s))]
+    (.clear s)
+    (.addAll s sorted-structs)
+    (trim! s)))
+
 (defn ^SOA make-SOA
   "Constructor function - takes any number of keys corresponding to the types
    of the elements of the structs.  Any key not in :boolean, :char, :byte,
