@@ -12,3 +12,9 @@ PersistentSOA: Persistent version of SOA with roughly the same performance
 as mutable version in optimal case
 Parameterize array expansion factor rather than having it as a literal
 Micro benchmarks as part of tests
+
+0.1.3:
+Intern the accessing functions to avoid duplication between instances
+Switch to using object-array for accessing functions
+Slightly more compact storage of width
+BitSets as alternative to boolean arrays, and :bit type (untested)
