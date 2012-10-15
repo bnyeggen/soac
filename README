@@ -24,6 +24,7 @@ you're looking at >32.  In general the object overhead will be at least between
 much worse.
 
 TODO:
+- Test BitSet-based arrays
 - Make persistent SOA implement IObj, maybe IPersistentVector.
 - Make both SOAs implement InternalReduce and IReduce
 - Examples of Java usage.
