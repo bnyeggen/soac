@@ -45,6 +45,15 @@
     (.add soa [0.0 -1 0.0])
     (is (== 1 (.lastIndexOf soa [0.0 -1 0.0])))))
 
+(deftest test-bits
+  (let [s (make-SOA :double :bit :int)
+        d (repeatedly 1000 #(vector (rand) (> 0.5 (rand)) (rand-int 100)))]
+    (is (.isEmpty s))
+    (.addAll s d)
+    (is (= (count s) 1000))
+    (is (not (.isEmpty s)))
+    (is (= s d))))
+
 (deftest test-immutable-SOA
   (let [s1 (-> (immutable-SOA :double :int :double)
              (conj [0.0 -1 0.0]))]

@@ -33,7 +33,8 @@
 (defn- aget-bits [^BitSet a i] (.get a i))
 
 (defn- aset-bit [^BitSet a ^long i v] 
-  (.set ^BitSet a i (if (or (not v) (== v 0) false) true)))
+  (.set ^BitSet a i (boolean (not (or (false? v) (nil? v)
+                                      (and (number? v) (== v 0)))))))
 
 (defn- expand-size [current] 
   (int (max (inc current) (* ARRAY-EXPANSION-FACTOR current))))
