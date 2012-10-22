@@ -152,7 +152,7 @@
   clojure.lang.Indexed
   (count [this] filledLength)
   (nth [this i] 
-    (if (>= i filledLength) 
+    (if (or (>= i filledLength) (< i 0)) 
       (throw (IndexOutOfBoundsException.))
       (loop [out (transient [])
              ct (int 0)]
@@ -225,15 +225,15 @@
   (listIterator [this] (SOAIterator. this (atom -0.5)))
   (listIterator [this index] (SOAIterator. this (atom (- index 0.5))))
   (remove [this ^int index]
-    (if (or (> 0 index) (>= index filledLength))
-      (throw (IndexOutOfBoundsException.))
-      (do (dotimes [array-n width]
-            (System/arraycopy (aget arrays array-n)
-                              (inc index)
-                              (aget arrays array-n)
-                              index
-                              (- filledLength index 1)))
-        (set! filledLength (unchecked-dec-int filledLength)))))
+    (let [e (nth this index)];throws IndexOOB if necessary
+      (dotimes [array-n width]
+        (System/arraycopy (aget arrays array-n)
+                          (inc index)
+                          (aget arrays array-n)
+                          index
+                          (- filledLength index 1)))
+      (set! filledLength (unchecked-dec-int filledLength))
+      e))
   (^boolean remove [this ^Object o]
     (let [i (.indexOf this o)]
       (if (<= 0 i) (do (.remove this i) true) false)))
