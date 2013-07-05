@@ -26,4 +26,5 @@ much worse.
 TODO:
 - Make persistent SOA implement IObj, maybe IPersistentVector.
 - Make both SOAs implement InternalReduce and IReduce
-- Examples of Java usage.
+- Examples of Java usage
+- Open-addressed primitive hashmap based on Clojure vector-ofs
