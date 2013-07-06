@@ -40,6 +40,9 @@
   (int (max (inc current) (* ARRAY-EXPANSION-FACTOR current))))
 
 (defn- get-interned-access-fns
+  "The point of this is to avoid constructing a new collection of pointers to
+   the same access / copying / etc. functions for every SOA we create, and
+   instead get another pointer to the same cached instance."
   [types]
   (if (contains? @typed-access-fns types)
     (get @typed-access-fns types)
