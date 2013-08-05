@@ -6,4 +6,4 @@
   :java-source-paths ["java-src"]
   ;And this is the Leiningen 1.7.x version
   :java-source-path "java-src"
-  :dependencies [[org.clojure/clojure "1.4.0"]])
+  :dependencies [[org.clojure/clojure "1.5.1"]])
