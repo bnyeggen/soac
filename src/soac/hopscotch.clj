@@ -6,7 +6,8 @@
 ;Because the vector fanout is 32, this is probably optimal
 (def ^:const neighborhood 32)
 
-;TODO: Support for object vectors, via extending vector-of
+;TODO: Support for object vectors, via extending vector-of or delegating to an
+;instance fn
 
 (defprotocol PrimHashTable
   ;TODO: findIndex should get the 2 possible .arrayFor, and use primitives or Java
@@ -145,21 +146,27 @@
   [type] 
   (let [real-length 32 ;Maybe have length be a parameter 
         free-val (get free-vals type)]
-    (PrimHashSet. (into (vector-of type) (repeat real-length free-val))
+    (PrimHashSet. (into (if (not= :object type) (vector-of type) []) 
+                        (repeat real-length free-val))
                   free-val
                   0 real-length nil)))
 
 ;Not ready yet.  Just to define interfaces.
 (deftype PrimHashMap
-  [k v _free ^int _size ^int _capacity _meta]
+  [ks vs _free ^int _size ^int _capacity _meta]
   PrimHashTable
-  (findIndex [this i])
-  (loadFactor [this])
+  (findIndex [this i]
+    (loop [pos (bit-mod _capacity (hash i)) ctr 0]
+      (when (> neighborhood ctr)
+        (if (== i (get ks pos)) pos
+          (recur (wrapping-inc _capacity pos)
+                 (unchecked-inc ctr))))))
+  (loadFactor [this] (/ (double _size) _capacity))
   (rehash [this i])
   (rehash [this] (rehash this 1))
   (shift [this free-pos item])
   clojure.lang.IObj
-  (withMeta [_ m] (PrimHashMap. k v _free _size _capacity m))
+  (withMeta [_ m] (PrimHashMap. ks vs _free _size _capacity m))
   (meta [_] _meta)
   clojure.lang.MapEquivalence
   clojure.lang.IHashEq
@@ -167,18 +174,37 @@
   clojure.lang.IPersistentMap
   (assoc [_ k v])
   ;Assoc if not present
-  (assocEx [_ k v])
-  (without [_ o])
-  (iterator [_])
-  (entryAt [_ k])
+  (assocEx [this k v]
+    (if (.findIndex this k) (throw (RuntimeException.))
+      (assoc this k v)))
+  (without [this o]
+    (if-let [idx (.findIndex this o)]
+      (PrimHashMap. (assoc ks idx _free) vs _free (unchecked-dec _size) _capacity _meta)
+      this))
+  (iterator [this] (clojure.lang.SeqIterator. (seq this)))
+  (entryAt [this k]
+    (when-let [idx (.findIndex this k)]
+      (clojure.lang.MapEntry. (nth ks idx) (nth vs idx))))
   (count [_] _size)
-  (cons [_ o])
-  (empty [_] (PrimHashMap.
-               (into (.empty ^clojure.lang.IPersistentCollection k) (repeat 32 _free))
-               (into (.empty ^clojure.lang.IPersistentCollection v) (repeat 32 _free))
-               _free 0 32 nil))
+  (cons [this o]
+    (cond (instance? java.util.Map$Entry o)
+            (assoc this (.getKey ^java.util.Map$Entry o)
+                        (.getValue ^java.util.Map$Entry o))
+          (instance? clojure.lang.IPersistentVector o)
+            (if (== 2 (count o)) (assoc this (first o) (second o)) 
+              (throw (RuntimeException.)))
+          :else (loop [out this remaining (seq o)]
+                  (if (empty? remaining) out
+                    (recur (assoc out (.getKey ^java.util.Map$Entry (first remaining))
+                                      (.getValue ^java.util.Map$Entry (first remaining)))
+                           (next remaining))))))
+  (empty [_] 
+    (PrimHashMap.
+      (into (.empty ^clojure.lang.IPersistentCollection ks) (repeat 32 _free))
+      (into (.empty ^clojure.lang.IPersistentCollection vs) (repeat 32 _free))
+      _free 0 32 nil))
   (equiv [_ o])
-  (seq [_])
+  (seq [_] (filter #(not= (first %) _free) (map #(clojure.lang.MapEntry. %1 %2) ks vs)))
   (valAt [_ k])
   clojure.lang.IFn
   (invoke [this k] (.valAt this k))
@@ -186,8 +212,8 @@
   (containsKey [_ k])
   (containsValue [this v])
   (entrySet [this])
-  (keySet [_] )
-  (values [this])
+  (keySet [_] (PrimHashSet. ks _free _size _capacity nil))
+  (values [this] (filter #(not= _free %) vs))
   (size [_] _size)
   (get [this k] (.valAt this k))
   (isEmpty [this] (== 0 _size))
