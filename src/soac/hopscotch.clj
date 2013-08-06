@@ -102,7 +102,7 @@
                     _capacity
                     _meta)
       this))
-  (contains [this e] (if (findIndex this e) true false))
+  (contains [this e] (boolean (.findIndex this e)))
   (get [this e] (when (.contains this e) e))
   (count [_] _size)
   (empty [_] (PrimHashSet. (into (.empty ^clojure.lang.IPersistentCollection arr) 
@@ -110,7 +110,7 @@
                              _free 0 32 nil))
   (equiv [this e] 
     (and 
-      (instance? e java.util.Set)
+      (instance? java.util.Set e)
       (== (.size ^java.util.Set e) _size)
       (.containsAll ^java.util.Set e this)))
   (seq [_] (remove #(== % _free) arr))
@@ -170,7 +170,7 @@
   (meta [_] _meta)
   clojure.lang.MapEquivalence
   clojure.lang.IHashEq
-  (hasheq [_])
+  (hasheq [this] (.hasheq ^clojure.lang.PersistentHashSet (.entrySet this)))
   clojure.lang.IPersistentMap
   (assoc [_ k v])
   ;Assoc if not present
@@ -203,17 +203,25 @@
       (into (.empty ^clojure.lang.IPersistentCollection ks) (repeat 32 _free))
       (into (.empty ^clojure.lang.IPersistentCollection vs) (repeat 32 _free))
       _free 0 32 nil))
-  (equiv [_ o])
-  (seq [_] (filter #(not= (first %) _free) (map #(clojure.lang.MapEntry. %1 %2) ks vs)))
-  (valAt [_ k])
+  (equiv [this o]
+    (and (instance? java.util.Map o)
+         (== (count this) (count o))
+         (every? #(= (.get this %)
+                     (.get ^java.util.Map o %)) 
+                 (keys this))))
+  (seq [_] (filter #(not= (.getKey ^clojure.lang.MapEntry %) _free) 
+                   (map #(clojure.lang.MapEntry. %1 %2) ks vs)))
+  (valAt [this k] 
+    (when-let [idx (.findIndex this k)]
+      (nth vs idx)))
   clojure.lang.IFn
   (invoke [this k] (.valAt this k))
   java.util.Map
-  (containsKey [_ k])
-  (containsValue [this v])
-  (entrySet [this])
+  (containsKey [this k] (boolean (.findIndex this k)))
+  (containsValue [this v] (.contains (.values this) v))
+  (entrySet [this] (into #{} (seq this)))
   (keySet [_] (PrimHashSet. ks _free _size _capacity nil))
-  (values [this] (filter #(not= _free %) vs))
+  (values [this] (map second (filter #(not= (first %) _free) (map vector ks vs))))
   (size [_] _size)
   (get [this k] (.valAt this k))
   (isEmpty [this] (== 0 _size))
