@@ -18,6 +18,7 @@ import clojure.lang.RT;
 import clojure.lang.SeqIterator;
 import clojure.lang.Util;
 
+//759 mb heap for 100M ints, in 292s, vs. 4,449 mb in 279s for a #{} (GC costs...)
 @SuppressWarnings("rawtypes")
 public class PersistentPrimHashSet extends AFn implements IObj, Collection, Set, IPersistentSet, IHashEq {
 	final IPersistentVector _data;
@@ -41,6 +42,14 @@ public class PersistentPrimHashSet extends AFn implements IObj, Collection, Set,
 	public static PersistentPrimHashSet fromProto(IPersistentVector data, Object free){
 		IPersistentVector dataStore = (IPersistentVector)data.empty();
 		for(int i=0; i<neighborhood; i++) dataStore = dataStore.cons(free);
+		return new PersistentPrimHashSet(dataStore, null, 0, free);
+	}
+	
+	public static PersistentPrimHashSet fromProto(IPersistentVector data, Object free, int size){
+		IPersistentVector dataStore = (IPersistentVector)data.empty();
+		for(int i=0; i<Math.max(neighborhood, (Integer.highestOneBit(size)<<1)); i++){
+			dataStore = dataStore.cons(free);
+		}
 		return new PersistentPrimHashSet(dataStore, null, 0, free);
 	}
 	

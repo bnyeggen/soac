@@ -40,7 +40,7 @@ public class PersistentPrimHashMap extends AFn implements Map, IObj, IPersistent
 	final static double rehashThresholdHi = 0.8;
 	final static double rehashThresholdLo = 0.25;
 
-	private PersistentPrimHashMap(IPersistentVector ks, IPersistentVector vs, int size, Object free, IPersistentMap meta) {
+	private PersistentPrimHashMap(IPersistentVector ks, IPersistentVector vs, IPersistentMap meta, int size, Object free) {
 		this._ks = ks;
 		this._vs = vs;
 		this._size = size;
@@ -57,8 +57,18 @@ public class PersistentPrimHashMap extends AFn implements Map, IObj, IPersistent
 			//Everything can store some version of 0
 			newVs = newVs.cons(0);
 		}
-		return new PersistentPrimHashMap(newKs, newVs, 0, free, null);
-
+		return new PersistentPrimHashMap(newKs, newVs, null, 0, free);
+	}
+	
+	public static PersistentPrimHashMap fromProto(IPersistentVector ks, IPersistentVector vs, Object free, int size){
+		IPersistentVector newKs = (IPersistentVector)ks.empty();
+		IPersistentVector newVs = (IPersistentVector)vs.empty();
+		
+		for(int i=0; i<Math.max(neighborhood, (Integer.highestOneBit(size)<<1)); i++){
+			newKs = newKs.cons(free);
+			newVs = newVs.cons(free);
+		}
+		return new PersistentPrimHashMap(newKs, newVs, null, 0, free);
 	}
 	
 	public int wrappingInc(int i){
@@ -128,7 +138,7 @@ public class PersistentPrimHashMap extends AFn implements Map, IObj, IPersistent
 			newVs = newVs.cons(0);
 		}
 		
-		PersistentPrimHashMap out = new PersistentPrimHashMap(newKs, newVs, 0, _free, _meta);
+		PersistentPrimHashMap out = new PersistentPrimHashMap(newKs, newVs, _meta, 0, _free);
 		for(ISeq es = seq(); es != null; es = es.next()){
 			final Map.Entry e = (Map.Entry)es.first();
 			out = (PersistentPrimHashMap)out.assoc(e.getKey(), e.getValue());
@@ -153,7 +163,7 @@ public class PersistentPrimHashMap extends AFn implements Map, IObj, IPersistent
 		}
 		//pos now represents the first free slot, and ct how far away it is from the insert point
 		if(ct<neighborhood) {
-			return new PersistentPrimHashMap(_ks.assocN(pos, k), _vs.assocN(pos, v), _size+1, _free, _meta);
+			return new PersistentPrimHashMap(_ks.assocN(pos, k), _vs.assocN(pos, v), _meta, _size+1, _free);
 		} 
 		//Shift elements, recursively if necessary
 		else {
@@ -169,7 +179,8 @@ public class PersistentPrimHashMap extends AFn implements Map, IObj, IPersistent
 					//And the top element switched to the bottom?
 					if(checkPosition(k, bottomPos)){
 						//Cool, make the switch and return
-						return new PersistentPrimHashMap(exchange(_ks, bottomPos, topPos), exchange(_vs, bottomPos, topPos), _size+1, _free, _meta);
+						return new PersistentPrimHashMap(exchange(_ks, bottomPos, topPos), exchange(_vs, bottomPos, topPos)
+								,_meta, _size+1, _free);
 					}
 					//Swap them anyway, and check further down for a valid swap, checking the new positions. 
 					else {
@@ -342,7 +353,7 @@ public class PersistentPrimHashMap extends AFn implements Map, IObj, IPersistent
 		if(load() < rehashThresholdLo && _capacity > neighborhood) 
 			return rehash(-1).without(k);
 		final int pos = findIndex(k);
-		if(pos>=0) return new PersistentPrimHashMap(_ks.assocN(pos,_free), _vs, _size-1, _free, _meta);
+		if(pos>=0) return new PersistentPrimHashMap(_ks.assocN(pos,_free), _vs, _meta, _size-1, _free);
 		return this;
 	}
 	@Override
@@ -363,7 +374,7 @@ public class PersistentPrimHashMap extends AFn implements Map, IObj, IPersistent
 	}
 	@Override
 	public IObj withMeta(IPersistentMap meta) {
-		return new PersistentPrimHashMap(_ks, _vs, _size, _free, meta);
+		return new PersistentPrimHashMap(_ks, _vs, meta, _size, _free);
 	}
 	@Override
 	public int size() {
