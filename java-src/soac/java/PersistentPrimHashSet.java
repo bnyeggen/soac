@@ -4,6 +4,8 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.Set;
 
+import clojure.core.ArrayManager;
+import clojure.core.Vec;
 import clojure.lang.AFn;
 import clojure.lang.ASeq;
 import clojure.lang.IHashEq;
@@ -14,6 +16,7 @@ import clojure.lang.IPersistentSet;
 import clojure.lang.IPersistentVector;
 import clojure.lang.ISeq;
 import clojure.lang.Obj;
+import clojure.lang.PersistentVector;
 import clojure.lang.RT;
 import clojure.lang.SeqIterator;
 import clojure.lang.Util;
@@ -75,9 +78,38 @@ public class PersistentPrimHashSet extends AFn implements IObj, Collection, Set,
 	
 	public int findIndex(Object o){
 		int pos = bitMod(o.hashCode());
-		for(int i=0; i<neighborhood; i++){
+		int ctr = 0;
+		
+		if(_data instanceof Vec){
+			final Vec vData = (Vec)_data;
+			final ArrayManager am = (ArrayManager)vData.am;
+			Object afor = vData.arrayFor(pos);
+			int localPos = pos & 0x1f;
+			while(ctr<neighborhood){
+				if(am.aget(afor, localPos).equals(o)) return pos;
+				localPos = (localPos + 1) & 31;
+				ctr++;
+				pos = wrappingInc(pos);
+				if(localPos==0) afor = vData.arrayFor(pos);
+			}
+		} else if(_data instanceof PersistentVector){
+			final PersistentVector vData = (PersistentVector)_data;
+			Object[] afor = vData.arrayFor(pos);
+			int localPos = pos & 31;
+			while(ctr<neighborhood){
+				if(afor[localPos].equals(o)) return pos;
+				localPos = (localPos + 1) & 31;
+				ctr++;
+				pos = wrappingInc(pos);
+				if(localPos==0) afor = vData.arrayFor(pos);
+			}
+			return -1;
+		}
+		
+		while(ctr<neighborhood){
 			if(_data.nth(pos).equals(o)) return pos;
 			pos = wrappingInc(pos);
+			ctr++;
 		}
 		return -1;
 	}

@@ -5,6 +5,8 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
+import clojure.core.ArrayManager;
+import clojure.core.Vec;
 import clojure.lang.AFn;
 import clojure.lang.APersistentMap;
 import clojure.lang.ASeq;
@@ -19,15 +21,15 @@ import clojure.lang.MapEntry;
 import clojure.lang.MapEquivalence;
 import clojure.lang.Obj;
 import clojure.lang.PersistentHashSet;
+import clojure.lang.PersistentVector;
 import clojure.lang.RT;
 import clojure.lang.SeqIterator;
 import clojure.lang.Util;
 
 //There is a fair amount of duplication between this and PersistentPrimHashSet.  Ideally we'd
-//have them both inherit from a PersistentPrimHashTable, but we have to extend AFn unless we want
-//to write all the boilerplate to fulfill IFn.
-//We could have this extend PersistentPrimHashSet, at the cost of implementing the Collection api via
-//a seq of k/v pairs.
+//have them both inherit from a PersistentPrimHashTable
+//We could also have this extend PersistentPrimHashSet, at the cost of implementing the 
+//Collection api via a seq of k/v pairs.
 
 @SuppressWarnings("rawtypes")
 public class PersistentPrimHashMap extends AFn implements Map, IObj, IPersistentMap, Iterable, IHashEq, MapEquivalence{
@@ -81,9 +83,38 @@ public class PersistentPrimHashMap extends AFn implements Map, IObj, IPersistent
 	
 	public int findIndex(Object o){
 		int pos = bitMod(o.hashCode());
-		for(int i=0; i<neighborhood; i++){
+		int ctr = 0;
+		
+		if(_ks instanceof Vec){
+			final Vec vData = (Vec)_ks;
+			final ArrayManager am = (ArrayManager)vData.am;
+			Object afor = vData.arrayFor(pos);
+			int localPos = pos & 0x1f;
+			while(ctr<neighborhood){
+				if(am.aget(afor, localPos).equals(o)) return pos;
+				localPos = (localPos + 1) & 31;
+				ctr++;
+				pos = wrappingInc(pos);
+				if(localPos==0) afor = vData.arrayFor(pos);
+			}
+		} else if(_ks instanceof PersistentVector){
+			final PersistentVector vData = (PersistentVector)_ks;
+			Object[] afor = vData.arrayFor(pos);
+			int localPos = pos & 31;
+			while(ctr<neighborhood){
+				if(afor[localPos].equals(o)) return pos;
+				localPos = (localPos + 1) & 31;
+				ctr++;
+				pos = wrappingInc(pos);
+				if(localPos==0) afor = vData.arrayFor(pos);
+			}
+			return -1;
+		}
+		
+		while(ctr<neighborhood){
 			if(_ks.nth(pos).equals(o)) return pos;
 			pos = wrappingInc(pos);
+			ctr++;
 		}
 		return -1;
 	}
