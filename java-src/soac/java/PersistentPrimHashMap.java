@@ -301,7 +301,7 @@ public class PersistentPrimHashMap extends AFn implements Map, IObj, IPersistent
 		public ISeq next() {
 			int pos = i+1;
 			while(pos < _capacity){
-				if (_vs.nth(pos).equals(_free)) pos++;
+				if (_ks.nth(pos).equals(_free)) pos++;
 				else return new FilteredSeq(pos, FilteredSeq.this.meta());
 			}
 			return null;
