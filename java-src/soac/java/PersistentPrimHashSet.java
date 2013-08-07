@@ -4,9 +4,6 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.Set;
 
-import clojure.core.ArrayManager;
-import clojure.core.Vec;
-import clojure.lang.AFn;
 import clojure.lang.ASeq;
 import clojure.lang.IHashEq;
 import clojure.lang.IObj;
@@ -16,30 +13,16 @@ import clojure.lang.IPersistentSet;
 import clojure.lang.IPersistentVector;
 import clojure.lang.ISeq;
 import clojure.lang.Obj;
-import clojure.lang.PersistentVector;
 import clojure.lang.RT;
 import clojure.lang.SeqIterator;
 import clojure.lang.Util;
 
 //759 mb heap for 100M ints, in 292s, vs. 4,449 mb in 279s for a #{} (GC costs...)
 @SuppressWarnings("rawtypes")
-public class PersistentPrimHashSet extends AFn implements IObj, Collection, Set, IPersistentSet, IHashEq {
-	final IPersistentVector _data;
-	final IPersistentMap _meta;
-	final int _size, _capacity;
-	//Should not be null
-	final Object _free;
-	
-	public static final int neighborhood = 32;
-	public static final double rehashThresholdHi = 0.8;
-	public static final double rehashThresholdLo = 0.25;
+public class PersistentPrimHashSet extends PersistentPrimHashTable implements IObj, Collection, Set, IPersistentSet, IHashEq {
 	
 	PersistentPrimHashSet(IPersistentVector data, IPersistentMap meta, int size, Object free) {
-		this._data = data;
-		this._meta = meta;
-		this._size = size;
-		this._capacity = data.count();
-		this._free = free;
+		super(data, meta, size, free);
 	}
 	
 	public static PersistentPrimHashSet fromProto(IPersistentVector data, Object free){
@@ -56,85 +39,6 @@ public class PersistentPrimHashSet extends AFn implements IObj, Collection, Set,
 		return new PersistentPrimHashSet(dataStore, null, 0, free);
 	}
 	
-	public int wrappingInc(int i){
-		return (i+1) & (_capacity - 1);
-	}
-	
-	public int bitMod(int i){
-		return i & (_capacity - 1);
-	}
-	
-	public int getCapacity(){
-		return _capacity;
-	}
-	
-	public Object getFree(){
-		return _free;
-	}
-	
-	public IPersistentVector getRawData(){
-		return _data;
-	}
-	
-	public int findIndex(Object o){
-		int pos = bitMod(o.hashCode());
-		int ctr = 0;
-		
-		if(_data instanceof Vec){
-			final Vec vData = (Vec)_data;
-			final ArrayManager am = (ArrayManager)vData.am;
-			Object afor = vData.arrayFor(pos);
-			int localPos = pos & 0x1f;
-			while(ctr<neighborhood){
-				if(am.aget(afor, localPos).equals(o)) return pos;
-				localPos = (localPos + 1) & 31;
-				ctr++;
-				pos = wrappingInc(pos);
-				if(localPos==0) afor = vData.arrayFor(pos);
-			}
-		} else if(_data instanceof PersistentVector){
-			final PersistentVector vData = (PersistentVector)_data;
-			Object[] afor = vData.arrayFor(pos);
-			int localPos = pos & 31;
-			while(ctr<neighborhood){
-				if(afor[localPos].equals(o)) return pos;
-				localPos = (localPos + 1) & 31;
-				ctr++;
-				pos = wrappingInc(pos);
-				if(localPos==0) afor = vData.arrayFor(pos);
-			}
-			return -1;
-		}
-		
-		while(ctr<neighborhood){
-			if(_data.nth(pos).equals(o)) return pos;
-			pos = wrappingInc(pos);
-			ctr++;
-		}
-		return -1;
-	}
-	
-	public int firstShiftablePos(int i){
-		return bitMod(i - neighborhood + 1);
-	}
-	
-	public double load(){
-		return ((double)_size) / ((double)_capacity);
-	}
-	
-	//Return if the object would "fit" at that position
-	public boolean checkPosition(Object o, int pos){
-		if(o.equals(_free)) return true;
-		final int bottom = bitMod(o.hashCode());
-		final int top = bitMod(o.hashCode() + neighborhood);
-		if(top > bottom) return (top > pos && pos >= bottom);
-		else return (top > pos || pos >= bottom);
-	}
-	
-	public static IPersistentVector exchange(IPersistentVector v, int i, int j){
-		Object iObj = v.nth(i);
-		return v.assocN(i, v.nth(j)).assocN(j, iObj);
-	}
 	
 	public PersistentPrimHashSet rehash(){
 		return rehash(1);
@@ -142,7 +46,7 @@ public class PersistentPrimHashSet extends AFn implements IObj, Collection, Set,
 	
 	public PersistentPrimHashSet rehash(int increment){
 		int newCapacity = _capacity << increment;
-		IPersistentVector newData = (IPersistentVector)_data.empty();
+		IPersistentVector newData = (IPersistentVector)_ks.empty();
 		for(int i=0; i<newCapacity; i++) newData = newData.cons(_free);
 		
 		PersistentPrimHashSet out = new PersistentPrimHashSet(newData, _meta, 0, _free);
@@ -158,18 +62,18 @@ public class PersistentPrimHashSet extends AFn implements IObj, Collection, Set,
 
 		int pos = bitMod(o.hashCode()); int ct = 0;
 		//Find the first free position
-		while(!_data.nth(pos).equals(_free)){
+		while(!_ks.nth(pos).equals(_free)){
 			pos = wrappingInc(pos);
 			ct++;
 		}
 		//pos now represents the first free slot, and ct how far away it is from the insert point
 		if(ct<neighborhood) {
-			return new PersistentPrimHashSet(_data.assocN(pos, o), _meta, _size+1, _free);
+			return new PersistentPrimHashSet(_ks.assocN(pos, o), _meta, _size+1, _free);
 		} 
 		//Shift elements, recursively if necessary
 		else {
 			//Temporarily store o in its invalid pos, while we search for a valid exchange
-			IPersistentVector newData = _data.assocN(pos, o);
+			IPersistentVector newData = _ks.assocN(pos, o);
 			int topPos = pos;
 			int bottomPos = firstShiftablePos(pos);
 			ct = 0;
@@ -214,7 +118,7 @@ public class PersistentPrimHashSet extends AFn implements IObj, Collection, Set,
 			return rehash(-1).disjoin(o);
 		int pos = findIndex(o);
 		if(pos<0) return this;
-		return new PersistentPrimHashSet(_data.assocN(pos, _free), _meta, _size - 1, _free);
+		return new PersistentPrimHashSet(_ks.assocN(pos, _free), _meta, _size - 1, _free);
 	}
 
 	@Override
@@ -239,7 +143,7 @@ public class PersistentPrimHashSet extends AFn implements IObj, Collection, Set,
 			super(null);
 			int pos = 0;
 			while(pos < _capacity){
-				if (_data.nth(pos).equals(_free)) pos++;
+				if (_ks.nth(pos).equals(_free)) pos++;
 				else {
 					i = pos;
 					return;
@@ -254,13 +158,13 @@ public class PersistentPrimHashSet extends AFn implements IObj, Collection, Set,
 		}
 		@Override
 		public Object first() {
-			return _data.nth(i);
+			return _ks.nth(i);
 		}
 		@Override
 		public ISeq next() {
 			int pos = i+1;
 			while(pos < _capacity){
-				if (_data.nth(pos).equals(_free)) pos++;
+				if (_ks.nth(pos).equals(_free)) pos++;
 				else return new FilteredSeq(pos, FilteredSeq.this.meta());
 			}
 			return null;
@@ -277,16 +181,12 @@ public class PersistentPrimHashSet extends AFn implements IObj, Collection, Set,
 		return new FilteredSeq();
 	}
 	@Override
-	public int count() {
-		return _size;
-	}
-	@Override
 	public IObj withMeta(IPersistentMap meta) {
-		return new PersistentPrimHashSet(_data, meta, _size, _free);
+		return new PersistentPrimHashSet(_ks, meta, _size, _free);
 	}
 	@Override
 	public IPersistentCollection empty() {
-		return fromProto(_data, _free);
+		return fromProto(_ks, _free);
 	}	@Override
 	public int hashCode() {
 		int sum = 0;
@@ -308,9 +208,6 @@ public class PersistentPrimHashSet extends AFn implements IObj, Collection, Set,
 		return new SeqIterator(seq());
 	}
 	@Override
-	public IPersistentMap meta() {
-		return _meta;
-	}	@Override
 	public int size() { return _size; }
 	@Override
 	public Object invoke(Object arg1) {
