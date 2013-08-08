@@ -1,30 +1,24 @@
 Java object overhead can be killer when dealing with large amounts of data.
-Coincidentally, traversal of lazily constructed and intricately nested data
-structures often takes more time than actual computation.
 Because of the way Java allocates arrays, the only real way to get around the
-object overhead is to represent a stream of objects as a Struct-Of-(primitive)
-Arrays, rather than an Array (or Seq)-Of-Structs.
+object overhead for a large number of small objects is to represent them as a
+Struct-Of-(primitive) Arrays, rather than an Array (or Seq)-Of-Structs.
 
-These are (mostly) fast, (especially) memory-efficient, (generally) general 
-Struct-Of-Arrays in Clojure.
+You can think of hash tables as a specialization of this, since they store a
+sequence of key-value pairs, arranged for fast lookup/insertion/removal.
 
-Two implementations are provided; a mutable SOA, and an immutable ImmutableSOA.
-AOT-compiling either should result in classes that are eminently usable from
-Java.
+Two families of data structures are provided to deal with these two issues:
+the SOAs (mutable, and immutable via COW) in soac.core, and the hash tables
+(both maps and sets) in soac.hopscotch.
 
-Performance notes:
-Conj-ing into a raw Clojure vector is faster than .addAll to a SOA, or conj-ing
-into an immutable SOA.  This is primarily due to unboxing and having to
-destructure the incoming array for the SOA version; for the Clojure vector it's
-all essentially pointer manipulation under the hood.  However, memory usage 
-should be much lower - a marginal entry in an long-boolean-int-double SOA takes
-21 bytes; for a Clojure deftype wrapping the primitives and stored in a vector,
-you're looking at >32.  In general the object overhead will be at least between
-8 and 15 bytes per entry.  The case when storing Clojure vector-of-vectors is
-much worse.
+You should expect large memory savings (the primitive-backed hash sets, for
+instance, take between 1/5 and 1/6 of the space of an equivalent
+PersistentHashSet) at the cost of some additional insertion time.  Lookups
+and removals should in general be as fast or faster.
 
 TODO:
-- Make persistent SOA implement IObj, maybe IPersistentVector.
-- Make both SOAs implement InternalReduce and IReduce
-- Examples of Java usage
-- Open-addressed primitive hashmap based on Clojure vector-ofs
+- Examples of usage
+- More unit tests
+- More benchmarks, segmented in their own testing namespace
+- Vector-of based SOA
+- Test incremental rehash in hopscotch
+- Test bitmap-based free list in hopscotch
