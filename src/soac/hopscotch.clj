@@ -4,7 +4,7 @@
   (:import [soac.java PersistentPrimHashMap PersistentPrimHashSet]))
 (set! *warn-on-reflection* true)
 
-(def free-val 
+(def ^{:private true} free-val 
   {:int Integer/MIN_VALUE
    :float Float/MIN_VALUE
    :long Long/MIN_VALUE
@@ -13,7 +13,7 @@
    :char Character/MIN_VALUE
    :object (Object.)})
 
-(defn vec-or-vecof
+(defn- vec-or-vecof
   [type]
   (if (= type :object) (vector) (vector-of type)))
 
