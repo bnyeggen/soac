@@ -21,4 +21,3 @@ TODO:
 - More benchmarks, segmented in their own testing namespace
 - Vector-of based SOA
 - Test incremental rehash in hopscotch
-- Test bitmap-based free list in hopscotch
