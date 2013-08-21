@@ -1,4 +1,4 @@
-(defproject soac "0.1.4-SNAPSHOT"
+(defproject soac "0.1.4"
   :description "Flexible structs-of-arrays"
   :url "https://github.com/fiatmoney/soac"
   :java-source-paths ["java-src"]
