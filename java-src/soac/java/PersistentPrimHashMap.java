@@ -84,7 +84,7 @@ public class PersistentPrimHashMap extends PersistentPrimHashTable implements Ma
 	}	
 	@Override
 	public IPersistentMap assoc(Object k, Object v) {
-		if(_free.equals(k)) throw new RuntimeException("Cannot sensibly have free value as a key");
+		if(Util.equiv(_free,k)) throw new RuntimeException("Cannot sensibly have free value as a key");
 		if(load() > rehashThresholdHi) return rehash().assoc(k,v);
 
 		int pos = bitMod(k.hashCode()); int ct = 0;

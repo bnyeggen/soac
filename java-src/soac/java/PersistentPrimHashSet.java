@@ -58,7 +58,7 @@ public class PersistentPrimHashSet extends PersistentPrimHashTable implements IO
 	
 	@Override
 	public IPersistentCollection cons(Object o) {
-		if(_free.equals(o)) throw new RuntimeException("Cannot sensibly conj free value");
+		if(Util.equiv(_free,o)) throw new RuntimeException("Cannot sensibly conj free value");
 		if(load() > rehashThresholdHi) return rehash().cons(o);
 
 		int pos = bitMod(o.hashCode()); int ct = 0;
