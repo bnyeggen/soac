@@ -116,7 +116,7 @@
     (is (= (last soa) (last sseq)))
     (is (= (first soa) (first sseq)))))
 
-(deftest test-speed
+(deftest ^:performance test-speed
   (let [s (vec (repeatedly 500000 
                  #(vector (rand) (rand-int 100) (rand))))
         soa (make-SOA :double :int :double)
