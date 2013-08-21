@@ -87,9 +87,14 @@ public class PersistentPrimHashMap extends PersistentPrimHashTable implements Ma
 		if(Util.equiv(_free,k)) throw new RuntimeException("Cannot sensibly have free value as a key");
 		if(load() > rehashThresholdHi) return rehash().assoc(k,v);
 
+		//Find the first free position, or the element if it exists
 		int pos = bitMod(k.hashCode()); int ct = 0;
-		//Find the first free position
-		while(!_ks.nth(pos).equals(_free)){
+		for(;;){
+			final Object thisK = _ks.nth(pos);
+			if(Util.equiv(k, thisK)) {
+				return new PersistentPrimHashMap(_ks, _vs.assocN(pos, v), _meta, _size, _free);
+			}
+			if(thisK.equals(_free)) break;
 			pos = wrappingInc(pos);
 			ct++;
 		}

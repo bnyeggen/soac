@@ -31,3 +31,13 @@
         d (reduce dissoc a c)
         e (reduce dissoc b c)]
     (is (= d e))))
+
+(deftest test-overwrite
+  (is (== 1 (count (into (prim-hash-set :int) [4 4]))))
+  (let [a (-> (prim-hash-map :int :double) (assoc 1 2.0) (assoc 1 3.0))]
+    (is (== 1 (count a)))
+    (is (== 3.0 (get a 1)))))
+
+(deftest test-boxing
+  (is (contains? (conj (prim-hash-set :int) (int 4)) (long 4)))
+  (is (== 1 (count (into (prim-hash-set :int) [(long 4) (int 4)])))))

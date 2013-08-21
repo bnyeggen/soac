@@ -61,12 +61,16 @@ public class PersistentPrimHashSet extends PersistentPrimHashTable implements IO
 		if(Util.equiv(_free,o)) throw new RuntimeException("Cannot sensibly conj free value");
 		if(load() > rehashThresholdHi) return rehash().cons(o);
 
+		//Find the first free position, or the element if it exists
 		int pos = bitMod(o.hashCode()); int ct = 0;
-		//Find the first free position
-		while(!_ks.nth(pos).equals(_free)){
+		for(;;){
+			final Object k = _ks.nth(pos);
+			if(Util.equiv(k, o)) return this;
+			if(k.equals(_free)) break;
 			pos = wrappingInc(pos);
 			ct++;
 		}
+
 		//pos now represents the first free slot, and ct how far away it is from the insert point
 		if(ct<neighborhood) {
 			return new PersistentPrimHashSet(_ks.assocN(pos, o), _meta, _size+1, _free);
