@@ -10,6 +10,14 @@ import clojure.lang.IPersistentVector;
 import clojure.lang.PersistentVector;
 import clojure.lang.Util;
 
+/* A note on ==, equiv and equals:
+ * We can in general never use ==, since values may be stored as primitives and
+ * boxed into new objects before comparing.
+ * We must use equiv when we're comparing to a passed-in parameter, since the
+ * underlying storage may cast and equiv takes care of those number comparisons.
+ * When we're comparing two pre-converted values, eg checking for _free, we can
+ * use equals for a modest speed boost over equiv.*/
+
 public abstract class PersistentPrimHashTable extends AFn implements IObj, Counted {
 	final IPersistentVector _ks;
 	final int _size, _capacity;
