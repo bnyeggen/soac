@@ -8,6 +8,7 @@ import clojure.lang.IObj;
 import clojure.lang.IPersistentMap;
 import clojure.lang.IPersistentVector;
 import clojure.lang.PersistentVector;
+import clojure.lang.Util;
 
 public abstract class PersistentPrimHashTable extends AFn implements IObj, Counted {
 	final IPersistentVector _ks;
@@ -53,7 +54,7 @@ public abstract class PersistentPrimHashTable extends AFn implements IObj, Count
 			Object afor = vData.arrayFor(pos);
 			int localPos = pos & 0x1f;
 			while(ctr<neighborhood){
-				if(am.aget(afor, localPos).equals(o)) return pos;
+				if(Util.equiv(am.aget(afor, localPos),o)) return pos;
 				localPos = (localPos + 1) & 31;
 				ctr++;
 				pos = wrappingInc(pos);
@@ -64,7 +65,7 @@ public abstract class PersistentPrimHashTable extends AFn implements IObj, Count
 			Object[] afor = vData.arrayFor(pos);
 			int localPos = pos & 31;
 			while(ctr<neighborhood){
-				if(afor[localPos].equals(o)) return pos;
+				if(Util.equiv(afor[localPos],o)) return pos;
 				localPos = (localPos + 1) & 31;
 				ctr++;
 				pos = wrappingInc(pos);
@@ -74,7 +75,7 @@ public abstract class PersistentPrimHashTable extends AFn implements IObj, Count
 		}
 		
 		while(ctr<neighborhood){
-			if(_ks.nth(pos).equals(o)) return pos;
+			if(Util.equiv(_ks.nth(pos),o)) return pos;
 			pos = wrappingInc(pos);
 			ctr++;
 		}
@@ -102,7 +103,7 @@ public abstract class PersistentPrimHashTable extends AFn implements IObj, Count
 	}
 
 	public boolean checkPosition(Object o, int pos){
-		if(o.equals(_free)) return true;
+		if(o == _free) return true;
 		final int bottom = bitMod(o.hashCode());
 		final int top = bitMod(o.hashCode() + neighborhood);
 		if(top > bottom) return (top > pos && pos >= bottom);
