@@ -103,7 +103,7 @@ public abstract class PersistentPrimHashTable extends AFn implements IObj, Count
 	}
 
 	public boolean checkPosition(Object o, int pos){
-		if(o == _free) return true;
+		if(_free.equals(o)) return true;
 		final int bottom = bitMod(o.hashCode());
 		final int top = bitMod(o.hashCode() + neighborhood);
 		if(top > bottom) return (top > pos && pos >= bottom);
