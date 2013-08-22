@@ -16,8 +16,9 @@ PersistentHashSet) at the cost of some additional insertion time.  Lookups
 and removals should in general be as fast or faster.
 
 TODO:
-- Examples of usage
-- More unit tests
-- More benchmarks, segmented in their own testing namespace
 - Vector-of based SOA
-- Test incremental rehash in hopscotch
+- Reducer support for SOAs
+- Transient support for hopscotch
+- Chunked sequences for hopscotch
+- Transient support for hopscotch
+- Reducer support for hopscotch
