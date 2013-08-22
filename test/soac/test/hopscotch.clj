@@ -54,21 +54,21 @@
                            a)))
         imm-set (do (print "Immutable primitive set insert: ")
                   (time (into (prim-hash-set :long) to-insert)))]
-    
+    (println)
     (print "Clojure set lookup: ")
     (time (every? #(contains? clj-set %) to-insert))
     (print "Java set lookup: ")
     (time (every? #(.contains ^HashSet java-set %) to-insert))
     (print "Immutable primitive set lookup: ")
     (time (every? #(contains? imm-set %) to-insert))
-    
+    (println)
     (print "Clojure set removal: ")
     (time (reduce disj clj-set to-insert))
     (print "Java set removal: ")
     (time (doseq [e to-insert] (.remove ^HashSet java-set e)))
     (print "Immutable primitive set removal: ")
     (time (reduce disj imm-set to-insert))
-    
+    (println)
     (print "Clojure set traversal: ")
     (time (doseq [e clj-set]))
     (print "Java set traversal: ")
