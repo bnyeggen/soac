@@ -62,7 +62,7 @@ public class PersistentPrimHashMap extends PersistentPrimHashTable implements Ma
 	}
 	
 	public PersistentPrimHashMap rehash(int increment){
-		int newCapacity = _capacity << increment;
+		int newCapacity = increment>0 ? _capacity << increment : _capacity >> -increment;
 		IPersistentVector newKs = (IPersistentVector)_ks.empty();
 		IPersistentVector newVs = (IPersistentVector)_vs.empty();
 		for(int i=0; i<newCapacity; i++) {

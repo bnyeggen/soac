@@ -45,7 +45,7 @@ public class PersistentPrimHashSet extends PersistentPrimHashTable implements IO
 	}
 	
 	public PersistentPrimHashSet rehash(int increment){
-		int newCapacity = _capacity << increment;
+		int newCapacity = increment>0 ? _capacity << increment : _capacity >> -increment;
 		IPersistentVector newData = (IPersistentVector)_ks.empty();
 		for(int i=0; i<newCapacity; i++) newData = newData.cons(_free);
 		
