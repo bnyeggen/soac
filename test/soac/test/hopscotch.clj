@@ -67,4 +67,11 @@
     (print "Java set removal: ")
     (time (doseq [e to-insert] (.remove ^HashSet java-set e)))
     (print "Immutable primitive set removal: ")
-    (time (reduce disj imm-set to-insert))))
+    (time (reduce disj imm-set to-insert))
+    
+    (print "Clojure set traversal: ")
+    (time (doseq [e clj-set]))
+    (print "Java set traversal: ")
+    (time (doseq [e java-set]))
+    (print "Immutable primitive set traversal: ")
+    (time (doseq [e imm-set]))))
