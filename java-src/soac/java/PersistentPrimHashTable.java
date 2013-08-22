@@ -19,6 +19,7 @@ import clojure.lang.Util;
  * use equals for a modest speed boost over equiv.*/
 
 public abstract class PersistentPrimHashTable extends AFn implements IObj, Counted {
+	//Under normal circumstances, also an IChunkedSeq
 	final IPersistentVector _ks;
 	final int _size, _capacity;
 	final Object _free;

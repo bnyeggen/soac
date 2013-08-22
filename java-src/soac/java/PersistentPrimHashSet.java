@@ -17,7 +17,6 @@ import clojure.lang.RT;
 import clojure.lang.SeqIterator;
 import clojure.lang.Util;
 
-//759 mb heap for 100M ints, in 292s, vs. 4,449 mb in 279s for a #{} (GC costs...)
 @SuppressWarnings("rawtypes")
 public class PersistentPrimHashSet extends PersistentPrimHashTable implements IObj, Collection, Set, IPersistentSet, IHashEq {
 	
