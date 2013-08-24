@@ -65,16 +65,25 @@ public class PersistentPrimHashMap extends PersistentPrimHashTable implements Ma
 		return rehash(1);
 	}
 	
+	//TODO: Specialize this for when _ks or _vs is an IEditableCollection
 	public PersistentPrimHashMap rehash(int increment){
 		int newCapacity = increment>0 ? _capacity << increment : _capacity >> -increment;
-		IPersistentVector newKs = (IPersistentVector)_ks.empty();
-		IPersistentVector newVs = (IPersistentVector)_vs.empty();
-		for(int i=0; i<newCapacity; i++) {
+		IPersistentVector newKs, newVs;
+		if(isEmpty()){
+			newKs = _ks;
+			newVs = _vs;
+		} else {
+			newKs = (IPersistentVector)_ks.empty();
+			newVs = (IPersistentVector)_vs.empty();
+		}
+		while(newKs.count() < newCapacity) {
 			newKs = newKs.cons(_free);
 			newVs = newVs.cons(0);
 		}
 		
 		PersistentPrimHashMap out = new PersistentPrimHashMap(newKs, newVs, _meta, 0, _free);
+		//Avoid traversing to check for free when we have no data
+		if(size()==0) return out;
 		for(ISeq es = seq(); es != null; es = es.next()){
 			final Map.Entry e = (Map.Entry)es.first();
 			out = (PersistentPrimHashMap)out.assoc(e.getKey(), e.getValue());

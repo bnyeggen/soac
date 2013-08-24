@@ -22,7 +22,9 @@ import clojure.lang.SeqIterator;
 import clojure.lang.Util;
 
 @SuppressWarnings("rawtypes")
-public class PersistentPrimHashSet extends PersistentPrimHashTable implements IObj, Collection, Set, IPersistentSet, IHashEq {
+public class PersistentPrimHashSet 
+	extends PersistentPrimHashTable 
+	implements IObj, Collection, Set, IPersistentSet, IHashEq {
 	
 	PersistentPrimHashSet(IPersistentVector data, IPersistentMap meta, int size, Object free) {
 		super(data, meta, size, free);
@@ -47,12 +49,15 @@ public class PersistentPrimHashSet extends PersistentPrimHashTable implements IO
 		return rehash(1);
 	}
 	
+	//TODO: Specialize this for when _ks is an IEditableCollection
 	public PersistentPrimHashSet rehash(int increment){
 		int newCapacity = increment>0 ? _capacity << increment : _capacity >> -increment;
-		IPersistentVector newData = (IPersistentVector)_ks.empty();
-		for(int i=0; i<newCapacity; i++) newData = newData.cons(_free);
+		IPersistentVector newData = isEmpty() ? _ks : (IPersistentVector)_ks.empty();
+		while(newData.count() < newCapacity) newData = newData.cons(_free);
 		
 		PersistentPrimHashSet out = new PersistentPrimHashSet(newData, _meta, 0, _free);
+		//Avoid traversing to check for free when we have no data
+		if(size()==0) return out;
 		for(Object o : this){
 			out = (PersistentPrimHashSet)out.cons(o);
 		}
@@ -65,6 +70,8 @@ public class PersistentPrimHashSet extends PersistentPrimHashTable implements IO
 		if(load() > rehashThresholdHi) return rehash().cons(o);
 
 		//Find the first free position, or the element if it exists
+		//Could make this slightly faster by scanning thru backing array directly instead
+		//of using nth
 		int pos = bitMod(o.hashCode()); int ct = 0;
 		for(;;){
 			final Object k = _ks.nth(pos);
@@ -240,7 +247,7 @@ public class PersistentPrimHashSet extends PersistentPrimHashTable implements IO
 		return new PersistentPrimHashSet(_ks, meta, _size, _free);
 	}
 	@Override
-	public IPersistentCollection empty() {
+	public PersistentPrimHashSet empty() {
 		return fromProto(_ks, _free);
 	}	@Override
 	public int hashCode() {
@@ -268,6 +275,7 @@ public class PersistentPrimHashSet extends PersistentPrimHashTable implements IO
 	public Object invoke(Object arg1) {
 		return get(arg1);
 	}
+		
 	@Override
 	public Object[] toArray() { return RT.seqToArray(seq()); }
 	@Override
