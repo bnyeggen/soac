@@ -1,7 +1,8 @@
 (ns soac.hopscotch
   "This should be considered as alpha at the moment.  Primitive-backed,
    persistent hash table data structures based on hopscotch hashing."
-  (:import [soac.java PersistentPrimHashMap PersistentPrimHashSet]))
+  (:import [soac.java PersistentPrimHashMap PersistentPrimHashSet])
+  (:require [clojure.core.reducers :as r]))
 (set! *warn-on-reflection* true)
 
 (def ^{:private true} free-val 
@@ -29,3 +30,13 @@
     (vec-or-vecof key-type)
     (vec-or-vecof val-type)
     (get free-val key-type)))
+
+;Clojure calls clojure.core.protocols/kv-reduce on PersistentPrimHashMap in r/reduce
+;and r/coll-fold if you call r/fold directly
+(extend-protocol r/CollFold
+  PersistentPrimHashSet
+  (r/coll-fold
+    [v n combinef reducef]
+    (let [free (.getFree v)]
+      (r/coll-fold (r/filter #(not (.equals free %)) (.getRawKeys v)) 
+                   n combinef reducef))))

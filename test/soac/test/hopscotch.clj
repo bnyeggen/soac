@@ -1,6 +1,7 @@
 (ns soac.test.hopscotch
   (:use clojure.test
         soac.hopscotch)
+  (:require [clojure.core.reducers :as r])
   (:import [java.util HashMap HashSet]))
 
 (deftest test-set
@@ -43,6 +44,9 @@
 (deftest test-boxing
   (is (contains? (conj (prim-hash-set :int) (int 4)) (long 4)))
   (is (== 1 (count (into (prim-hash-set :int) [(long 4) (int 4)])))))
+
+(deftest test-reducers
+  (is (->> [1 2 3 4 5] (into (prim-hash-set :int)) (r/reduce +) (== 15))))
 
 (deftest ^:performance test-speed
   (let [to-insert (long-array (repeatedly 1000000 #(rand-int Integer/MAX_VALUE)))

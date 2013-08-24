@@ -18,7 +18,5 @@ and removals should in general be as fast or faster.
 TODO:
 - Vector-of based SOA
 - Reducer support for SOAs
+- Reducer support for PersistentPrimHashMap
 - Transient support for hopscotch
-- Chunked sequences for hopscotch
-- Transient support for hopscotch
-- Reducer support for hopscotch
