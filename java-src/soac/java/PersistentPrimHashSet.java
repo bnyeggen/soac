@@ -5,6 +5,9 @@ import java.util.Iterator;
 import java.util.Set;
 
 import clojure.lang.ASeq;
+import clojure.lang.ChunkBuffer;
+import clojure.lang.IChunk;
+import clojure.lang.IChunkedSeq;
 import clojure.lang.IHashEq;
 import clojure.lang.IObj;
 import clojure.lang.IPersistentCollection;
@@ -13,6 +16,7 @@ import clojure.lang.IPersistentSet;
 import clojure.lang.IPersistentVector;
 import clojure.lang.ISeq;
 import clojure.lang.Obj;
+import clojure.lang.PersistentList;
 import clojure.lang.RT;
 import clojure.lang.SeqIterator;
 import clojure.lang.Util;
@@ -140,49 +144,96 @@ public class PersistentPrimHashSet extends PersistentPrimHashTable implements IO
 		return o;
 	}
 	
-	private class FilteredSeq extends ASeq{
-		private static final long serialVersionUID = -4366857561968576225L;
-		final int i;
-		public FilteredSeq() {
-			super(null);
-			int pos = 0;
-			while(pos < _capacity){
-				if (_ks.nth(pos).equals(_free)) pos++;
-				else {
-					i = pos;
-					return;
-				}
-			}
-			//Should never be reached, as before constructing we check for empty.
-			i = -1;
+	private class FilteredSeq extends ASeq implements IChunkedSeq{
+		private static final long serialVersionUID = 1L;
+
+		final IPersistentMap meta;
+		final IChunk fChunk;
+		final IChunkedSeq rest;
+		final int offset;
+		protected FilteredSeq(IPersistentMap meta, IChunk fChunk, IChunkedSeq rest, int offset) {
+			this.meta = meta;
+			this.fChunk = fChunk;
+			this.rest = rest;
+			this.offset = offset;
 		}
-		private FilteredSeq(int pos, IPersistentMap meta) {
-			super(meta);
-			i = pos;
+		public FilteredSeq(IChunkedSeq s, IPersistentMap meta) {
+			this.meta = meta;
+			offset = 0;
+			IChunkedSeq thisRest = (IChunkedSeq) s;
+			IChunk thisFirst = s.chunkedFirst();
+			final ChunkBuffer buf = new ChunkBuffer(thisFirst.count());
+			boolean appended = false;
+			while (!appended) {
+				for (int i = 0; i < thisFirst.count(); i++) {
+					if (!thisFirst.nth(i).equals(_free)) {
+						appended = true;
+						buf.add(thisFirst.nth(i));
+					}
+				}
+				thisRest = (IChunkedSeq) thisRest.chunkedNext();
+				if (thisRest == null)
+					break;
+				thisFirst = thisRest.chunkedFirst();
+			}
+			fChunk = buf.chunk();
+			rest = thisRest;
+		}
+		@Override
+		public IChunk chunkedFirst() {
+			return fChunk;
+		}
+		@Override
+		public ISeq chunkedMore() {
+			final ISeq out = chunkedNext();
+			if (out == null)
+				return PersistentList.EMPTY;
+			return out;
+		}
+		@Override
+		public ISeq chunkedNext() {
+			if (this.rest == null)
+				return null;
+			IChunkedSeq thisRest = rest;
+			IChunk thisFirst = thisRest.chunkedFirst();
+			final ChunkBuffer buf = new ChunkBuffer(thisFirst.count());
+			boolean appended = false;
+			while (!appended) {
+				for (int i = 0; i < thisFirst.count(); i++) {
+					if (!thisFirst.nth(i).equals(_free)) {
+						appended = true;
+						buf.add(thisFirst.nth(i));
+					}
+				}
+				thisRest = (IChunkedSeq) thisRest.chunkedNext();
+				if (thisRest == null)
+					break;
+				thisFirst = thisRest.chunkedFirst();
+			}
+			if (buf.count() == 0)
+				return null;
+			return new FilteredSeq(meta, buf.chunk(), thisRest, 0);
 		}
 		@Override
 		public Object first() {
-			return _ks.nth(i);
+			return fChunk.nth(offset);
 		}
 		@Override
 		public ISeq next() {
-			int pos = i+1;
-			while(pos < _capacity){
-				if (_ks.nth(pos).equals(_free)) pos++;
-				else return new FilteredSeq(pos, FilteredSeq.this.meta());
-			}
-			return null;
+			if (offset + 1 < fChunk.count())
+				return new FilteredSeq(meta, fChunk, rest, offset + 1);
+			return chunkedNext();
 		}
 		@Override
 		public Obj withMeta(IPersistentMap meta) {
-			return new FilteredSeq(i, meta);
+			return new FilteredSeq(this, meta);
 		}
 	}
-	
+		
 	@Override
 	public ISeq seq() {
 		if(_size==0) return null;
-		return new FilteredSeq();
+		return new FilteredSeq((IChunkedSeq)_ks.seq(), null);
 	}
 	@Override
 	public IObj withMeta(IPersistentMap meta) {
