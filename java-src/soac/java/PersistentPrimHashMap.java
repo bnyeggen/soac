@@ -7,6 +7,9 @@ import java.util.Set;
 
 import clojure.lang.APersistentMap;
 import clojure.lang.ASeq;
+import clojure.lang.ChunkBuffer;
+import clojure.lang.IChunk;
+import clojure.lang.IChunkedSeq;
 import clojure.lang.IHashEq;
 import clojure.lang.IMapEntry;
 import clojure.lang.IObj;
@@ -18,6 +21,7 @@ import clojure.lang.MapEntry;
 import clojure.lang.MapEquivalence;
 import clojure.lang.Obj;
 import clojure.lang.PersistentHashSet;
+import clojure.lang.PersistentList;
 import clojure.lang.RT;
 import clojure.lang.SeqIterator;
 import clojure.lang.Util;
@@ -221,49 +225,126 @@ public class PersistentPrimHashMap extends PersistentPrimHashTable implements Ma
 		return APersistentMap.mapHasheq(this);
 	}
 	
-	private class FilteredSeq extends ASeq{
-		private static final long serialVersionUID = -4366857561968576225L;
-		final int i;
-		public FilteredSeq() {
-			super(null);
-			int pos = 0;
-			while(pos < _capacity){
-				if (_ks.nth(pos).equals(_free)) pos++;
-				else {
-					i = pos;
-					return;
-				}
-			}
-			//Should never be reached, as before constructing we check for empty.
-			i = -1;
+	private class FilteredSeq extends ASeq implements IChunkedSeq{
+		private static final long serialVersionUID = 1L;
+
+		final IPersistentMap meta;
+		//Consists of MapEntrys
+		final IChunk fChunk;
+
+		final IChunkedSeq rest_ks;
+		final IChunkedSeq rest_vs;
+
+		final int offset;
+		
+		protected FilteredSeq(IPersistentMap meta, IChunk fChunk, 
+							  IChunkedSeq rest_ks, IChunkedSeq rest_vs, int offset) {
+			this.meta = meta;
+			this.offset = offset;
+			this.fChunk = fChunk;
+			this.rest_ks = rest_ks;
+			this.rest_vs = rest_vs;
 		}
-		private FilteredSeq(int pos, IPersistentMap meta) {
-			super(meta);
-			i = pos;
+		public FilteredSeq(IChunkedSeq ks, IChunkedSeq vs, IPersistentMap meta) {
+			this.meta = meta;
+			offset = 0;
+			IChunkedSeq thisRestKs = (IChunkedSeq) ks;
+			IChunkedSeq thisRestVs = (IChunkedSeq) vs;
+			//If these have different lengths, it gets complicated, but for Vectors and Vecs they
+			//are the same
+			IChunk thisFirstKs = ks.chunkedFirst();
+			IChunk thisFirstVs = vs.chunkedFirst();
+			
+			if(thisFirstKs.count() != thisFirstVs.count())
+				throw new RuntimeException("Different chunk sizes between keys and vals not implemented yet");
+			final int chunkSize = thisFirstKs.count();
+			
+			final ChunkBuffer buf = new ChunkBuffer(chunkSize);
+			boolean appended = false;
+			while (!appended) {
+				for (int i = 0; i < chunkSize; i++) {
+					if (!thisFirstKs.nth(i).equals(_free)) {
+						appended = true;
+						buf.add(new MapEntry(thisFirstKs.nth(i), thisFirstVs.nth(i)));
+					}
+				}
+				thisRestKs = (IChunkedSeq) thisRestKs.chunkedNext();
+				thisRestVs = (IChunkedSeq) thisRestVs.chunkedNext();
+				if (thisRestKs == null || thisRestVs == null)
+					break;
+				thisFirstKs = thisRestKs.chunkedFirst();
+				thisFirstVs = thisRestVs.chunkedFirst();
+			}
+			fChunk = buf.chunk();
+			this.rest_ks = thisRestKs;
+			this.rest_vs = thisRestVs;
+		}
+		@Override
+		public IChunk chunkedFirst() {
+			return fChunk;
+		}
+		@Override
+		public ISeq chunkedMore() {
+			final ISeq out = chunkedNext();
+			if (out == null)
+				return PersistentList.EMPTY;
+			return out;
+		}
+		@Override
+		public ISeq chunkedNext() {
+			if (this.rest_ks == null || this.rest_vs == null)
+				return null;
+			IChunkedSeq thisRestKs = rest_ks;
+			IChunkedSeq thisRestVs = rest_vs;
+			
+			IChunk thisFirstKs = thisRestKs.chunkedFirst();
+			IChunk thisFirstVs = thisRestVs.chunkedFirst();
+
+			if(thisFirstKs.count() != thisFirstVs.count())
+				throw new RuntimeException("Different chunk sizes between keys and vals not implemented yet");
+			final int chunkSize = thisFirstKs.count();
+			
+			final ChunkBuffer buf = new ChunkBuffer(chunkSize);
+			boolean appended = false;
+			while (!appended) {
+				for (int i = 0; i < chunkSize; i++) {
+					if (!thisFirstKs.nth(i).equals(_free)) {
+						appended = true;
+						buf.add(new MapEntry(thisFirstKs.nth(i), thisFirstVs.nth(i)));
+					}
+				}
+				thisRestKs = (IChunkedSeq) thisRestKs.chunkedNext();
+				thisRestVs = (IChunkedSeq) thisRestVs.chunkedNext();
+				if (thisRestKs == null || thisRestVs == null)
+					break;
+				thisFirstKs = thisRestKs.chunkedFirst();
+				thisFirstVs = thisRestVs.chunkedFirst();
+			}
+			if (buf.count() == 0)
+				return null;
+			return new FilteredSeq(meta, buf.chunk(), thisRestKs, thisRestVs, 0);
 		}
 		@Override
 		public Object first() {
-			return new MapEntry(_ks.nth(i), _vs.nth(i));
+			return fChunk.nth(offset);
 		}
 		@Override
 		public ISeq next() {
-			int pos = i+1;
-			while(pos < _capacity){
-				if (_ks.nth(pos).equals(_free)) pos++;
-				else return new FilteredSeq(pos, FilteredSeq.this.meta());
-			}
-			return null;
+			if (offset + 1 < fChunk.count())
+				return new FilteredSeq(meta, fChunk, rest_ks, rest_vs, offset + 1);
+			return chunkedNext();
 		}
 		@Override
 		public Obj withMeta(IPersistentMap meta) {
-			return new FilteredSeq(i, meta);
+			return new FilteredSeq(meta, fChunk, rest_ks, rest_vs, offset);
 		}
 	}
+
 	
 	@Override
 	public ISeq seq() {
 		if(_size==0) return null;
-		return new FilteredSeq();
+		return new FilteredSeq((IChunkedSeq)_ks.seq(), (IChunkedSeq)_vs.seq(), null);
 	}
 	@Override
 	public Collection values() {
