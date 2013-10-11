@@ -46,7 +46,8 @@
   (is (== 1 (count (into (prim-hash-set :int) [(long 4) (int 4)])))))
 
 (deftest test-reducers
-  (is (->> [1 2 3 4 5] (into (prim-hash-set :int)) (r/reduce +) (== 15))))
+  (is (->> [1 2 3 4 5] (into (prim-hash-set :int)) (r/reduce +) (== 15)))
+  (is (->> [[0 1][2 3][4 5]] (into (prim-hash-map :int :int)) (r/reduce +) (== 15) )))
 
 (deftest ^:performance test-speed
   (let [to-insert (long-array (repeatedly 1000000 #(rand-int Integer/MAX_VALUE)))
