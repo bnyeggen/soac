@@ -49,7 +49,7 @@
           fc (fn [childks childvs] #(fold-kvs childks childvs n combinef reducef))]
       (fj/fjinvoke 
         #(let [f1 (fc ks1 vs1)
-               t2 (r/fjtask (fc ks1 vs2))]
+               t2 (r/fjtask (fc ks2 vs2))]
            (fj/fjfork t2)
            (combinef (f1) (fj/fjjoin t2)))))))
 
