@@ -100,22 +100,26 @@ public class PersistentPrimHashMap extends PersistentPrimHashTable implements Ma
 		if(Util.equiv(_free,k)) throw new RuntimeException("Cannot sensibly have free value as a key");
 		if(load() > rehashThresholdHi) return rehash().assoc(k,v);
 
-		//Find the first free position, or the element if it exists
-		int pos = bitMod(k.hashCode()); int ct = 0;
+		//Find the first free position, or the element if it exists in the neighborhood
+		int pos = bitMod(k.hashCode()); int ct = 0; int freePos = -1;
 		for(;;){
 			final Object thisK = _ks.nth(pos);
 			if(Util.equiv(k, thisK)) {
 				return new PersistentPrimHashMap(_ks, _vs.assocN(pos, v), _meta, _size, _free);
 			}
-			if(thisK.equals(_free)) break;
+			if(thisK.equals(_free)) {
+				if(ct<neighborhood && freePos == -1) freePos = pos;
+				else if(ct >= neighborhood) break;
+			}
 			pos = wrappingInc(pos);
 			ct++;
 		}
-		//pos now represents the first free slot, and ct how far away it is from the insert point
-		if(ct<neighborhood) {
-			return new PersistentPrimHashMap(_ks.assocN(pos, k), _vs.assocN(pos, v), _meta, _size+1, _free);
+		//first free element is now at ct away from optimal insertion point, and stored in freePos
+		//if inside neighborhood; otherwise freePos is -1 and value is stored in pos.
+		if(freePos != -1) {
+			return new PersistentPrimHashMap(_ks.assocN(freePos, k), _vs.assocN(freePos, v), _meta, _size+1, _free);
 		} 
-		//Shift elements, recursively if necessary
+		//Otherwise it's at pos.  Shift elements, recursively if necessary
 		else {
 			//Temporarily store o in its invalid pos, while we search for a valid exchange
 			IPersistentVector newKs = _ks.assocN(pos, k);

@@ -69,21 +69,28 @@ public class PersistentPrimHashSet
 		if(Util.equiv(_free,o)) throw new RuntimeException("Cannot sensibly conj free value");
 		if(load() > rehashThresholdHi) return rehash().cons(o);
 
-		//Find the first free position, or the element if it exists
+		//Find the first free position, or the element if it exists inside the neighborhood
 		//Could make this slightly faster by scanning thru backing array directly instead
 		//of using nth
-		int pos = bitMod(o.hashCode()); int ct = 0;
+		int pos = bitMod(o.hashCode()); int ct = 0; int freePos = -1;
 		for(;;){
 			final Object k = _ks.nth(pos);
 			if(Util.equiv(k, o)) return this;
-			if(k.equals(_free)) break;
+			if(k.equals(_free)){
+				//Element may be beyond the free position, but still in the neighborhood
+				if(ct<neighborhood && freePos == -1) freePos = pos;
+				//If we're outside the neighborhood though, the element is guaranteed not to be there.
+				else if(ct >= neighborhood) break;
+			}
 			pos = wrappingInc(pos);
 			ct++;
 		}
 
-		//pos now represents the first free slot, and ct how far away it is from the insert point
+		//freePos now represents the first free slot, and ct how far away it is from the insert point
 		if(ct<neighborhood) {
-			return new PersistentPrimHashSet(_ks.assocN(pos, o), _meta, _size+1, _free);
+			//freePos will be set to a valid position IFF there is a free position in the neighborhood
+			//and the element is not in the neighborhood already
+			return new PersistentPrimHashSet(_ks.assocN(freePos, o), _meta, _size+1, _free);
 		} 
 		//Shift elements, recursively if necessary
 		else {
