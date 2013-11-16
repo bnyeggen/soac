@@ -9,12 +9,12 @@ import clojure.lang.APersistentVector;
 import clojure.lang.IObj;
 import clojure.lang.IPersistentCollection;
 import clojure.lang.IPersistentMap;
-import clojure.lang.IPersistentStack;
 import clojure.lang.IPersistentVector;
 import clojure.lang.Keyword;
 import clojure.lang.RT;
 
 public class PersistentByteArrayVector extends APersistentVector implements IObj {
+	public static final long serialVersionUID = 1L;
 	final byte[] contents;
 	final IPersistentMap _meta;
 	public final static int PERSISTENT_VECTOR_THRESHOLD = 256;

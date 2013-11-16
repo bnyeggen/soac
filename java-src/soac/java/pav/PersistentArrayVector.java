@@ -10,6 +10,7 @@ import clojure.lang.IPersistentVector;
 import clojure.lang.PersistentVector;
 
 public class PersistentArrayVector extends APersistentVector implements IObj {
+	public static final long serialVersionUID = 1L;
 	// There is little point to making this implement IEditableCollection
 	// directly,
 	// since below 32 or so elements it's as fast or faster than a

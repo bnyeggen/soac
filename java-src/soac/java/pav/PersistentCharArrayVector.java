@@ -14,6 +14,7 @@ import clojure.lang.Keyword;
 import clojure.lang.RT;
 
 public class PersistentCharArrayVector extends APersistentVector implements IObj {
+	public static final long serialVersionUID = 1L;
 	final char[] contents;
 	final IPersistentMap _meta;
 	public final static int PERSISTENT_VECTOR_THRESHOLD = 128;
