@@ -44,7 +44,11 @@
   "interns => [intern1 intern2...]
    Binds the given intern symbols to functions which take an ISeq, and return
    an equal copy where, to the extent possible, the tail has been replaced by
-   the tails of previous arguments.  Given these functions, execute the body."
+   the tails of previous arguments.  Given these functions, execute the body.
+
+   The actual sequence replacement is handled via .cons(), so it is only really
+   efficient for linked list-type data structures (existing cons-based seqs, 
+   and various Lists, but typically not vector- or array-backed seqs)."
   [interns & body]
   (cond (= (count interns) 0)
           `(do ~@body)
