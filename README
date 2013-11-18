@@ -42,6 +42,10 @@ built-in version). They evolve to the built-in data structures when they
 contain enough elements that copy-on-write is no longer efficient.  Currently
 we set that at the equivalent of 256 bytes or 32 object references.
 
+- The interning facilities of soac.intern.  This surfaces the ability to
+deduplicate persistent data structures with no loss of flexibility by replacing
+equivalent objects with pointers to the same underlying instance.
+
 TODO:
 - Vector-of based SOA
 - Reducer support for SOAs
