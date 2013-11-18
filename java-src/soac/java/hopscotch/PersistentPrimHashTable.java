@@ -1,4 +1,4 @@
-package soac.java;
+package soac.java.hopscotch;
 
 import clojure.core.ArrayManager;
 import clojure.core.Vec;

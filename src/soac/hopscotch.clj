@@ -1,7 +1,7 @@
 (ns soac.hopscotch
   "This should be considered as alpha at the moment.  Primitive-backed,
    persistent hash table data structures based on hopscotch hashing."
-  (:import [soac.java PersistentPrimHashMap PersistentPrimHashSet])
+  (:import [soac.java.hopscotch PersistentPrimHashMap PersistentPrimHashSet])
   (:require [clojure.core.reducers :as r]
             [soac.fj-dupe :as fj]))
 (set! *warn-on-reflection* true)
