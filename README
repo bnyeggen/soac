@@ -46,6 +46,10 @@ we set that at the equivalent of 256 bytes or 32 object references.
 deduplicate persistent data structures with no loss of flexibility by replacing
 equivalent objects with pointers to the same underlying instance.
 
+- The miscellaneous compact data structures (UTF8-based CharSequences with
+optionally shared structure, more compact persistent linked lists) of
+soac.java.util
+
 TODO:
 - Vector-of based SOA
 - Reducer support for SOAs
