@@ -1,6 +1,6 @@
 (ns soac.intern
   (:import [java.util.concurrent ConcurrentHashMap]
-           [soac.java.intern InternedSuffixPool]))
+           [soac.java.intern InternedSuffixPool VectorPrefixPool]))
 (set! *warn-on-reflection* true)
 
 ;Easier to embed the type hint here than in the macro
@@ -55,4 +55,25 @@
         (symbol? (interns 0))
           `(let [intern# (InternedSuffixPool.)
                  ~(interns 0) (partial intern-suffix intern#)]
+             (with-interns ~(subvec interns 1) ~@body))))
+
+(defn intern-vector-prefix
+  "Take the given IPersistentVector, and attempt to replace as much of the
+   head as possible with shared structure from existing cached instances in the
+   given pool."
+  [^VectorPrefixPool pool v]
+  (.intern pool v))
+
+(defmacro with-vector-prefix-intern
+  "interns => [intern1 intern2...]
+   Binds the given intern symbols to functions which take an IPersistentVector,
+   and return an equal copy where, to the extent possible, the head has been
+   replaced by the headss of previous arguments.  Given these functions,
+   execute the body."
+  [interns & body]
+  (cond (= (count interns) 0)
+          `(do ~@body)
+        (symbol? (interns 0))
+          `(let [intern# (VectorPrefixPool.)
+                 ~(interns 0) (partial intern-vector-prefix intern#)]
              (with-interns ~(subvec interns 1) ~@body))))
