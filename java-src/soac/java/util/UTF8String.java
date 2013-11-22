@@ -6,6 +6,13 @@ public class UTF8String implements CharSequence {
 	final byte[] data;
 	final static Charset utf8 = Charset.forName("UTF-8");
 	
+	//Returns either a UTF8String, or a GZippedUTF8String, whichever is smaller
+	public static UTF8String compactString(CharSequence cs){
+		final UTF8String asUTF8 = new UTF8String(cs);
+		final GZippedUTF8String asGZUTF8 = new GZippedUTF8String(cs);
+		return asUTF8.data.length > asGZUTF8.data.length ? asGZUTF8 : asUTF8;
+	}
+	
 	public UTF8String(String s) {
 		data = s.getBytes(utf8);
 	}
@@ -78,5 +85,9 @@ public class UTF8String implements CharSequence {
 	
 	public boolean contentEquals(CharSequence c){
 		return toString().equals(c.toString());
+	}
+	
+	public byte[] getBytes(){
+		return data.clone();
 	}
 }
