@@ -64,4 +64,8 @@ public class GZippedUTF8String extends UTF8String {
 	public int hashCode() {
 		return toString().hashCode();
 	}
+	@Override
+	public UTF8SharedDataString sharedSubSequence(int start, int end){
+		throw new UnsupportedOperationException("Compressed strings don't support sharing subsequences");
+	}
 }
