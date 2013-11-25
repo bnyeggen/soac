@@ -8,7 +8,8 @@ sequence of key-value pairs, arranged for fast lookup/insertion/removal.
 
 We provide a few families of data structures to deal with these issues:
 
-- The SOAs (mutable, and immutable via COW) in soac.core.  They are both
+- The SOAs (mutable, immutable via COW on arrays, and immutable/persistent via
+Clojure vector-ofs) in soac.soa.  They are
 essentially code-efficient ways to support an object composed of multiple
 primitive "columns", rather than a list of "rows" of objects, which would
 each have additional object overhead.  The immutable version is specialized
@@ -16,9 +17,8 @@ for the case where it is mostly grow-and-use; as long as you always add to the
 "end" of the SOA, all referers can share views of the earlier parts by tracking
 their offsets.  "Modifying" before the end, or adding to a view before the
 "real" end of the array, will result in independent copies being made.  If
-that's your use case, you may be better off using Clojure data structures
-(eventually I will implement clojure.core.Vec-backed SOAs, which would have
-increased structural sharing at the cost of increased overhead).
+that's your use case, you may be better off using the persistent vector-SOA
+vesion.
 
 - The hash tables (both maps and sets) in soac.hopscotch.  These use hopscotch
 hashing, an algorithm which guarantees that elements, if they exist, will be
@@ -47,11 +47,9 @@ deduplicate persistent data structures with no loss of flexibility by replacing
 equivalent objects with pointers to the same underlying instance.
 
 - The miscellaneous compact data structures (UTF8-based CharSequences with
-optionally shared structure, more compact persistent linked lists) of
-soac.java.util
+optionally shared structure & compression, more compact persistent linked
+lists) of soac.java.util
 
 TODO:
-- Vector-of based SOA
-- Reducer support for SOAs
 - Transient support for hopscotch (ideally via adding transient support to
   gvec, which I'm told will happen eventually)
