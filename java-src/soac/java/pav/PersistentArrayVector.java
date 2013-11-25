@@ -26,7 +26,7 @@ public class PersistentArrayVector extends APersistentVector implements IObj {
 	final IPersistentMap _meta;
 	public final static int PERSISTENT_VECTOR_THRESHOLD = 32;
 
-	PersistentArrayVector(Object[] contents, IPersistentMap meta) {
+	public PersistentArrayVector(Object[] contents, IPersistentMap meta) {
 		super();
 		this.contents = contents;
 		this._meta = meta;
