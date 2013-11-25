@@ -1,4 +1,4 @@
-(defproject com.nyeggen/soac "0.1.6-SNAPSHOT"
+(defproject com.nyeggen/soac "0.5"
   :description "Primitive-backed collections for Clojure"
   :url "https://github.com/fiatmoney/soac"
   :java-source-paths ["java-src"]
