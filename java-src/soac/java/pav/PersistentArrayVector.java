@@ -12,13 +12,10 @@ import clojure.lang.PersistentVector;
 public class PersistentArrayVector extends APersistentVector implements IObj {
 	public static final long serialVersionUID = 1L;
 	// There is little point to making this implement IEditableCollection
-	// directly,
-	// since below 32 or so elements it's as fast or faster than a
-	// TransientVector,
-	// and above that you'd want to be using a TransientVector anyway, which
-	// will
-	// persist back to a PersistentVector and not a PersistentArrayVector
-	// regardless of the length.
+	// directly, since below 32 or so elements it's as fast or faster than a
+	// TransientVector, and above that you'd want to be using a TransientVector
+	// anyway, which will persist back to a PersistentVector and not a
+	// PersistentArrayVector regardless of the length.
 	// If this was integrated into PersistentVector the same way that
 	// PersistentArrayMap is integrated into PersistentHashMap, the transition
 	// would be seamless and it might be worth doing.
