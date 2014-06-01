@@ -19,3 +19,4 @@ contain enough elements that copy-on-write is no longer efficient. Currently we 
 TODO:
 
 - Transient support for hopscotch (ideally via adding transient support to gvec, which I'm told will happen eventually)
+- Persistent bloom filter
