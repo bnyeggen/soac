@@ -20,3 +20,8 @@ TODO:
 
 - Transient support for hopscotch (ideally via adding transient support to gvec, which I'm told will happen eventually)
 - Persistent bloom filter
+
+
+LICENSE:
+
+Distributed under the Eclipse Public License v1.0
